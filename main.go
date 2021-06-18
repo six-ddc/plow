@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"gopkg.in/alecthomas/kingpin.v3-unstable"
 	"io/ioutil"
 	"os"
 	"strings"
+
+	"gopkg.in/alecthomas/kingpin.v3-unstable"
 )
 
 var (
@@ -22,7 +23,7 @@ var (
 	host        = kingpin.Flag("host", "Host header").String()
 	contentType = kingpin.Flag("content", "Content-Type header").Short('T').String()
 
-	chartsListenAddr = kingpin.Flag("listen", "Listen addr to serve Web UI").Default("127.0.0.1:18888").String()
+	chartsListenAddr = kingpin.Flag("listen", "Listen addr to serve Web UI").Default(":18888").String()
 	chartsLinkAddr   = kingpin.Flag("link", "Link addr used for show Web html and request backend server").Default("127.0.0.1:18888").String()
 	timeout          = kingpin.Flag("timeout", "Timeout for each http request").PlaceHolder("DURATION").Duration()
 	dialTimeout      = kingpin.Flag("dial-timeout", "Timeout for dial addr").PlaceHolder("DURATION").Duration()
@@ -91,14 +92,17 @@ Example:
 		host:        *host,
 	}
 
-	fmt.Printf("Benchmarking %s", *url)
+	var desc string
+	desc = fmt.Sprintf("Benchmarking %s", *url)
 	if *requests > 0 {
-		fmt.Printf(" with %d request(s)", *requests)
+		desc += fmt.Sprintf(" with %d request(s)", *requests)
 	}
 	if *duration > 0 {
-		fmt.Printf(" for %s", duration.String())
+		desc += fmt.Sprintf(" for %s", duration.String())
 	}
-	fmt.Printf(" using %d connection(s)\n", *concurrency)
+	desc += fmt.Sprintf(" using %d connection(s).", *concurrency)
+
+	fmt.Println(desc)
 	if *chartsListenAddr != "" {
 		fmt.Printf("> Real-time charts is listening on http://%s/\n", *chartsLinkAddr)
 	}
@@ -115,7 +119,7 @@ Example:
 	go report.Collect(requester.RecordChan())
 
 	if *chartsListenAddr != "" {
-		charts, err := NewCharts(*chartsListenAddr, *chartsLinkAddr, report.Charts)
+		charts, err := NewCharts(*chartsListenAddr, *chartsLinkAddr, report.Charts, desc)
 		if err != nil {
 			errAndExit(err.Error())
 			return

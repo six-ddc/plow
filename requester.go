@@ -8,8 +8,6 @@ import (
 	"go.uber.org/automaxprocs/maxprocs"
 	"io/ioutil"
 	"net"
-	"net/http"
-	_ "net/http/pprof"
 	url2 "net/url"
 	"os"
 	"os/signal"
@@ -22,7 +20,8 @@ import (
 )
 
 var (
-	startTime = time.Now()
+	startTime        = time.Now()
+	sendOnCloseError interface{}
 )
 
 type ReportRecord struct {
@@ -38,10 +37,16 @@ var recordPool = sync.Pool{
 }
 
 func init() {
-	go func() {
-		http.ListenAndServe("0.0.0.0:6060", nil)
-	}()
+	// Honoring env GOMAXPROCS
 	_, _ = maxprocs.Set()
+	defer func() {
+		sendOnCloseError = recover()
+	}()
+	func() {
+		cc := make(chan struct{}, 1)
+		close(cc)
+		cc <- struct{}{}
+	}()
 }
 
 type MyConn struct {
@@ -91,6 +96,7 @@ type Requester struct {
 	httpHeader  *fasthttp.RequestHeader
 
 	recordChan chan *ReportRecord
+	closeOnce  sync.Once
 	report     *StreamReport
 	errCount   int64
 	wg         sync.WaitGroup
@@ -206,37 +212,10 @@ func (r *Requester) RecordChan() <-chan *ReportRecord {
 	return r.recordChan
 }
 
-func getErrorType(err error) string {
-	switch err {
-	case fasthttp.ErrTimeout:
-		return "Timeout"
-	case fasthttp.ErrNoFreeConns:
-		return "NoFreeConns"
-	case fasthttp.ErrConnectionClosed:
-		return "ConnClosed"
-	case fasthttp.ErrDialTimeout:
-		return "DialTimeout"
-	default:
-		if opErr, ok := err.(*net.OpError); ok {
-			err = opErr.Err
-		}
-		switch t := err.(type) {
-		case *net.DNSError:
-			return "DNS"
-		case *os.SyscallError:
-			if errno, ok := t.Err.(syscall.Errno); ok {
-				switch errno {
-				case syscall.ECONNREFUSED:
-					return "ConnRefused"
-				case syscall.ETIMEDOUT:
-					return "Timeout"
-				case syscall.EADDRNOTAVAIL:
-					return "AddrNotAvail"
-				}
-			}
-		}
-	}
-	return "Unknown"
+func (r *Requester) closeRecord() {
+	r.closeOnce.Do(func() {
+		close(r.recordChan)
+	})
 }
 
 func (r *Requester) DoRequest(req *fasthttp.Request, resp *fasthttp.Response, rr *ReportRecord) {
@@ -291,20 +270,28 @@ func (r *Requester) Run() {
 	r.cancel = cancelFunc
 	go func() {
 		<-sigs
+		r.closeRecord()
 		cancelFunc()
 	}()
+	startTime = time.Now()
 	if r.duration > 0 {
 		time.AfterFunc(r.duration, func() {
+			r.closeRecord()
 			cancelFunc()
 		})
 	}
 
-	startTime = time.Now()
 	semaphore := r.requests
 	for i := 0; i < r.concurrency; i++ {
 		r.wg.Add(1)
 		go func() {
-			defer r.wg.Done()
+			defer func() {
+				r.wg.Done()
+				v := recover()
+				if v != nil && v != sendOnCloseError {
+					panic(v)
+				}
+			}()
 			req := &fasthttp.Request{}
 			resp := &fasthttp.Response{}
 			r.httpHeader.CopyTo(&req.Header)
@@ -351,5 +338,5 @@ func (r *Requester) Run() {
 	}
 
 	r.wg.Wait()
-	close(r.recordChan)
+	r.closeRecord()
 }

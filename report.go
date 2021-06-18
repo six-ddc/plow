@@ -76,6 +76,7 @@ type StreamReport struct {
 
 	latencyWithinSec *Stats
 	rpsWithinSec     float64
+	noDateWithinSec  bool
 
 	readBytes  int64
 	writeBytes int64
@@ -131,6 +132,9 @@ func (s *StreamReport) Collect(records <-chan *ReportRecord) {
 					*s.latencyWithinSec = *latencyWithinSecTemp
 					s.rpsWithinSec = rps
 					latencyWithinSecTemp.Reset()
+					s.noDateWithinSec = false
+				} else {
+					s.noDateWithinSec = true
 				}
 				s.lock.Unlock()
 			case <-s.doneChan:
@@ -235,7 +239,7 @@ func (s *StreamReport) Snapshot() *SnapshotReport {
 
 	rs.Percentiles = make([]*struct {
 		Percentile float64
-		Latency       time.Duration
+		Latency    time.Duration
 	}, len(quantiles))
 	for i, p := range quantiles {
 		rs.Percentiles[i] = &struct {
@@ -271,9 +275,14 @@ type ChartsReport struct {
 
 func (s *StreamReport) Charts() *ChartsReport {
 	s.lock.Lock()
-	cr := &ChartsReport{
-		RPS:     s.rpsWithinSec,
-		Latency: *s.latencyWithinSec,
+	var cr *ChartsReport
+	if s.noDateWithinSec {
+		cr = nil
+	} else {
+		cr = &ChartsReport{
+			RPS:     s.rpsWithinSec,
+			Latency: *s.latencyWithinSec,
+		}
 	}
 	s.lock.Unlock()
 	return cr

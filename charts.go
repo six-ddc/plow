@@ -12,26 +12,9 @@ import (
 	"github.com/valyala/fasthttp"
 	"net"
 	"strings"
-	"sync"
 	"text/template"
 	"time"
 )
-
-func init() {
-	templates.PageTpl = `
-{{- define "page" }}
-<!DOCTYPE html>
-<html>
-    {{- template "header" . }}
-<body>
-<p align="center">🚀 <a href="https://github.com/six-ddc/plow"><b>plow</b></a> <em>is a high-performance HTTP benchmarking tool with real-time web UI and terminal displaying</em></p>
-<style> .box { justify-content:center; display:flex; flex-wrap:wrap } </style>
-<div class="box"> {{- range .Charts }} {{ template "base" . }} {{- end }} </div>
-</body>
-</html>
-{{ end }}
-`
-}
 
 var (
 	assertsPath     = "/echarts/statics/"
@@ -43,7 +26,7 @@ var (
 )
 
 const (
-	DefaultTemplate string = `
+	ViewTpl = `
 $(function () { setInterval({{ .ViewID }}_sync, {{ .Interval }}); });
 function {{ .ViewID }}_sync() {
     $.ajax({
@@ -64,10 +47,23 @@ function {{ .ViewID }}_sync() {
         }
     });
 }`
+	PageTpl = `
+{{- define "page" }}
+<!DOCTYPE html>
+<html>
+    {{- template "header" . }}
+<body>
+<p align="center">🚀 <a href="https://github.com/six-ddc/plow"><b>Plow</b></a> %s</p>
+<style> .box { justify-content:center; display:flex; flex-wrap:wrap } </style>
+<div class="box"> {{- range .Charts }} {{ template "base" . }} {{- end }} </div>
+</body>
+</html>
+{{ end }}
+`
 )
 
 func (c *Charts) genViewTemplate(vid, route string) string {
-	tpl, err := template.New("view").Parse(DefaultTemplate)
+	tpl, err := template.New("view").Parse(ViewTpl)
 	if err != nil {
 		panic("failed to parse template " + err.Error())
 	}
@@ -88,7 +84,7 @@ func (c *Charts) genViewTemplate(vid, route string) string {
 
 	buf := bytes.Buffer{}
 	if err := tpl.Execute(&buf, d); err != nil {
-		panic("statsview: failed to execute template " + err.Error())
+		panic("failed to execute template " + err.Error())
 	}
 
 	return buf.String()
@@ -137,8 +133,8 @@ func (c *Charts) newRPSView() components.Charter {
 }
 
 type Metrics struct {
-	Values []float64 `json:"values"`
-	Time   string    `json:"time"`
+	Values []interface{} `json:"values"`
+	Time   string        `json:"time"`
 }
 
 type Charts struct {
@@ -146,12 +142,11 @@ type Charts struct {
 	linkAddr   string
 	page       *components.Page
 	ln         net.Listener
-	lock       sync.Mutex
-	reportData ChartsReport
 	dataFunc   func() *ChartsReport
 }
 
-func NewCharts(listenAddr string, linkAddr string, dataFunc func() *ChartsReport) (*Charts, error) {
+func NewCharts(listenAddr string, linkAddr string, dataFunc func() *ChartsReport, desc string) (*Charts, error) {
+	templates.PageTpl = fmt.Sprintf(PageTpl, desc)
 	ln, err := net.Listen("tcp4", listenAddr)
 	if err != nil {
 		return nil, err
@@ -180,17 +175,24 @@ func (c *Charts) Handler(ctx *fasthttp.RequestCtx) {
 	default:
 		if strings.HasPrefix(path, apiPath) {
 			view := path[len(apiPath)+1:]
-			var values []float64
-			c.lock.Lock()
+			var values []interface{}
+			reportData := c.dataFunc()
 			switch view {
 			case latencyView:
-				values = append(values, c.dataFunc().Latency.min/1e6)
-				values = append(values, c.dataFunc().Latency.Mean()/1e6)
-				values = append(values, c.dataFunc().Latency.max/1e6)
+				if reportData != nil {
+					values = append(values, reportData.Latency.min/1e6)
+					values = append(values, reportData.Latency.Mean()/1e6)
+					values = append(values, reportData.Latency.max/1e6)
+				} else {
+					values = append(values, nil, nil, nil)
+				}
 			case rpsView:
-				values = append(values, c.dataFunc().RPS)
+				if reportData != nil {
+					values = append(values, reportData.RPS)
+				} else {
+					values = append(values, nil)
+				}
 			}
-			c.lock.Unlock()
 			metrics := &Metrics{
 				Time:   time.Now().Format(timeFormat),
 				Values: values,
@@ -203,17 +205,6 @@ func (c *Charts) Handler(ctx *fasthttp.RequestCtx) {
 }
 
 func (c *Charts) Serve() {
-	go func() {
-		ticker := time.NewTicker(refreshInterval)
-		for {
-			select {
-			case <-ticker.C:
-				c.lock.Lock()
-				c.reportData = *c.dataFunc()
-				c.lock.Unlock()
-			}
-		}
-	}()
 	server := fasthttp.Server{
 		Handler: cors.DefaultHandler().CorsMiddleware(c.Handler),
 	}
