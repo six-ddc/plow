@@ -51,6 +51,13 @@ Binary and image distributions are available through the [releases](https://gith
 go get github.com/six-ddc/plow
 ```
 
+### Via Docker
+
+```bash
+docker run --rm --net=host ghcr.io/six-ddc/plow
+# docker run --rm -p 18888:18888 ghcr.io/six-ddc/plow
+```
+
 ### Via Homebrew
 
 *Coming soon*
