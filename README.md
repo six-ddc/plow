@@ -60,7 +60,9 @@ docker run --rm --net=host ghcr.io/six-ddc/plow
 
 ### Via Homebrew
 
-*Coming soon*
+```sh
+brew install plow
+```
 
 ## Usage
 
