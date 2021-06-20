@@ -1,4 +1,4 @@
-# plow
+# plow <!-- omit in toc -->
 
 Plow is a HTTP(S) benchmarking tool, written in Golang. It uses excellent [fasthttp](https://github.com/valyala/fasthttp#http-client-comparison-with-nethttp) instead of Go's default net/http due to its lightning fast performance.
 
@@ -40,6 +40,15 @@ Latency Histogram:
   403µs      58
   524µs       3
 ```
+
+- [Installation](#installation)
+  - [Via Go](#via-go)
+  - [Via Docker](#via-docker)
+  - [Via Homebrew](#via-homebrew)
+- [Usage](#usage)
+  - [Options](#options)
+  - [Examples](#examples)
+  - [License](#license)
 
 ## Installation
 
