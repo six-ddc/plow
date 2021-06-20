@@ -104,7 +104,7 @@ Example:
 
 	fmt.Println(desc)
 	if *chartsListenAddr != "" {
-		fmt.Printf("> Real-time charts is listening on http://%s/\n", *chartsLinkAddr)
+		fmt.Printf("@ Real-time charts is listening on http://%s/\n", *chartsLinkAddr)
 	}
 	fmt.Printf("\n")
 
