@@ -1,5 +1,8 @@
 # plow <!-- omit in toc -->
 
+[![build](https://github.com/six-ddc/plow/actions/workflows/release.yml/badge.svg)](https://github.com/six-ddc/plow/actions/workflows/release.yml)
+[![Homebrew](https://img.shields.io/badge/dynamic/json.svg?url=https://formulae.brew.sh/api/formula/plow.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/plow)
+
 Plow is a HTTP(S) benchmarking tool, written in Golang. It uses excellent [fasthttp](https://github.com/valyala/fasthttp#http-client-comparison-with-nethttp) instead of Go's default net/http due to its lightning fast performance.
 
 Plow runs at a specified connections(`-c`) concurrently and **real-time** records a summary statistics, histogram of execution time and calculates percentiles to display on Web UI and terminal. It can run for a set duration(`-d`), for a fixed number of requests(`-n`), or until Ctrl-C interrupted.
