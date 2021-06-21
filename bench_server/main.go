@@ -2,13 +2,19 @@ package main
 
 import (
 	"flag"
-	"github.com/valyala/fasthttp"
 	"log"
 	"math/rand"
 	"strconv"
+	"time"
+
+	"github.com/valyala/fasthttp"
 )
 
 var serverPort = flag.Int("p", 8080, "port to use for benchmarks")
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 func main() {
 	flag.Parse()
