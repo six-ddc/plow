@@ -2,12 +2,20 @@
 
 [![build](https://github.com/six-ddc/plow/actions/workflows/release.yml/badge.svg)](https://github.com/six-ddc/plow/actions/workflows/release.yml)
 [![Homebrew](https://img.shields.io/badge/dynamic/json.svg?url=https://formulae.brew.sh/api/formula/plow.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/plow)
+[![GitHub license](https://img.shields.io/github/license/six-ddc/plow.svg)](https://github.com/six-ddc/plow/blob/main/LICENSE)
+[![made-with-Go](https://img.shields.io/badge/Made%20with-Go-1f425f.svg)](http://golang.org)
 
-Plow is a HTTP(S) benchmarking tool, written in Golang. It uses excellent [fasthttp](https://github.com/valyala/fasthttp#http-client-comparison-with-nethttp) instead of Go's default net/http due to its lightning fast performance.
+Plow is a HTTP(S) benchmarking tool, written in Golang. It uses
+excellent [fasthttp](https://github.com/valyala/fasthttp#http-client-comparison-with-nethttp) instead of Go's default
+net/http due to its lightning fast performance.
 
-Plow runs at a specified connections(`-c`) concurrently and **real-time** records a summary statistics, histogram of execution time and calculates percentiles to display on Web UI and terminal. It can run for a set duration(`-d`), for a fixed number of requests(`-n`), or until Ctrl-C interrupted.
+Plow runs at a specified connections(option `-c`) concurrently and **real-time** records a summary statistics, histogram
+of execution time and calculates percentiles to display on Web UI and terminal. It can run for a set duration(
+option `-d`), for a fixed number of requests(option `-n`), or until Ctrl-C interrupted.
 
-The implementation of real-time computing Histograms and Quantiles using stream-based algorithms inspired by [prometheus](https://github.com/prometheus/client_golang) with low memory and CPU bounds. so it's almost no additional performance overhead for benchmarking.
+The implementation of real-time computing Histograms and Quantiles using stream-based algorithms inspired
+by [prometheus](https://github.com/prometheus/client_golang) with low memory and CPU bounds. so it's almost no
+additional performance overhead for benchmarking.
 
 ![](https://github.com/six-ddc/plow/blob/main/demo.gif?raw=true)
 
@@ -45,17 +53,19 @@ Latency Histogram:
 ```
 
 - [Installation](#installation)
-  - [Via Go](#via-go)
-  - [Via Docker](#via-docker)
-  - [Via Homebrew](#via-homebrew)
+    - [Via Go](#via-go)
+    - [Via Homebrew](#via-homebrew)
+    - [Via Docker](#via-docker)
 - [Usage](#usage)
-  - [Options](#options)
-  - [Examples](#examples)
-  - [License](#license)
+    - [Options](#options)
+    - [Examples](#examples)
+- [Stargazers](#Stargazers)
+- [License](#license)
 
 ## Installation
 
-Binary and image distributions are available through the [releases](https://github.com/six-ddc/plow/releases) assets page.
+Binary and image distributions are available through the [releases](https://github.com/six-ddc/plow/releases)
+assets page.
 
 ### Via Go
 
@@ -63,17 +73,17 @@ Binary and image distributions are available through the [releases](https://gith
 go get github.com/six-ddc/plow
 ```
 
+### Via Homebrew
+
+```sh
+brew install plow
+```
+
 ### Via Docker
 
 ```bash
 docker run --rm --net=host ghcr.io/six-ddc/plow
 # docker run --rm -p 18888:18888 ghcr.io/six-ddc/plow
-```
-
-### Via Homebrew
-
-```sh
-brew install plow
 ```
 
 ## Usage
@@ -130,5 +140,10 @@ POST a json file:
 plow http://127.0.0.1:8080/ -c 20 --body @file.json -T 'application/json' -m POST
 ```
 
-### License
+## Stargazers
+
+[![Stargazers over time](https://starchart.cc/six-ddc/plow.svg)](https://starchart.cc/six-ddc/plow)
+
+## License
+
 See [LICENSE](https://github.com/six-ddc/plow/blob/master/LICENSE).
