@@ -104,14 +104,6 @@ func (s *StreamReport) insert(v float64) {
 	s.latencyStats.Update(v)
 }
 
-func (s *StreamReport) percentiles() ([]float64, []float64) {
-	result := make([]float64, len(quantiles))
-	for i, f := range quantiles {
-		result[i] = s.latencyQuantile.Query(f)
-	}
-	return quantiles, result
-}
-
 func (s *StreamReport) Collect(records <-chan *ReportRecord) {
 	latencyWithinSecTemp := &Stats{}
 	go func() {
@@ -153,10 +145,10 @@ func (s *StreamReport) Collect(records <-chan *ReportRecord) {
 		latencyWithinSecTemp.Update(float64(r.cost))
 		s.insert(float64(r.cost))
 		if r.code != "" {
-			s.codes[r.code] += 1
+			s.codes[r.code] ++
 		}
 		if r.error != "" {
-			s.errors[r.error] += 1
+			s.errors[r.error] ++
 		}
 		s.readBytes = r.readBytes
 		s.writeBytes = r.writeBytes
