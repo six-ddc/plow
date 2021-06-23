@@ -24,7 +24,6 @@ var (
 	contentType = kingpin.Flag("content", "Content-Type header").Short('T').String()
 
 	chartsListenAddr = kingpin.Flag("listen", "Listen addr to serve Web UI").Default(":18888").String()
-	chartsLinkAddr   = kingpin.Flag("link", "Link addr used for show Web html and request backend server").Default("127.0.0.1:18888").String()
 	timeout          = kingpin.Flag("timeout", "Timeout for each http request").PlaceHolder("DURATION").Duration()
 	dialTimeout      = kingpin.Flag("dial-timeout", "Timeout for dial addr").PlaceHolder("DURATION").Duration()
 	reqWriteTimeout  = kingpin.Flag("req-timeout", "Timeout for full request writing").PlaceHolder("DURATION").Duration()
@@ -101,12 +100,7 @@ Example:
 		desc += fmt.Sprintf(" for %s", duration.String())
 	}
 	desc += fmt.Sprintf(" using %d connection(s).", *concurrency)
-
 	fmt.Println(desc)
-	if *chartsListenAddr != "" {
-		fmt.Printf("@ Real-time charts is listening on http://%s/\n", *chartsLinkAddr)
-	}
-	fmt.Printf("\n")
 
 	requester, err := NewRequester(*concurrency, *requests, *duration, &clientOpt)
 	if err != nil {
@@ -119,7 +113,7 @@ Example:
 	go report.Collect(requester.RecordChan())
 
 	if *chartsListenAddr != "" {
-		charts, err := NewCharts(*chartsListenAddr, *chartsLinkAddr, report.Charts, desc)
+		charts, err := NewCharts(*chartsListenAddr, report.Charts, desc)
 		if err != nil {
 			errAndExit(err.Error())
 			return
