@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 	"text/template"
 	"time"
@@ -207,5 +210,55 @@ func (c *Charts) Serve() {
 	server := fasthttp.Server{
 		Handler: cors.DefaultHandler().CorsMiddleware(c.Handler),
 	}
+	go openBrowser("http://" + c.ln.Addr().String())
 	_ = server.Serve(c.ln)
+}
+
+// openBrowser go/src/cmd/internal/browser/browser.go
+func openBrowser(url string) bool {
+	var cmds [][]string
+	if exe := os.Getenv("BROWSER"); exe != "" {
+		cmds = append(cmds, []string{exe})
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		cmds = append(cmds, []string{"/usr/bin/open"})
+	case "windows":
+		cmds = append(cmds, []string{"cmd", "/c", "start"})
+	default:
+		if os.Getenv("DISPLAY") != "" {
+			// xdg-open is only for use in a desktop environment.
+			cmds = append(cmds, []string{"xdg-open"})
+		}
+	}
+	cmds = append(cmds,
+		[]string{"chrome"},
+		[]string{"google-chrome"},
+		[]string{"chromium"},
+		[]string{"firefox"},
+	)
+	for _, args := range cmds {
+		cmd := exec.Command(args[0], append(args[1:], url)...)
+		if cmd.Start() == nil && appearsSuccessful(cmd, 3*time.Second) {
+			return true
+		}
+	}
+	return false
+}
+
+// appearsSuccessful reports whether the command appears to have run successfully.
+// If the command runs longer than the timeout, it's deemed successful.
+// If the command runs within the timeout, it's deemed successful if it exited cleanly.
+func appearsSuccessful(cmd *exec.Cmd, timeout time.Duration) bool {
+	errc := make(chan error, 1)
+	go func() {
+		errc <- cmd.Wait()
+	}()
+
+	select {
+	case <-time.After(timeout):
+		return true
+	case err := <-errc:
+		return err == nil
+	}
 }
