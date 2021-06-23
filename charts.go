@@ -4,16 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
+	"strings"
+	"text/template"
+	"time"
+
 	cors "github.com/AdhityaRamadhanus/fasthttpcors"
 	"github.com/go-echarts/go-echarts/v2/charts"
 	"github.com/go-echarts/go-echarts/v2/components"
 	"github.com/go-echarts/go-echarts/v2/opts"
 	"github.com/go-echarts/go-echarts/v2/templates"
 	"github.com/valyala/fasthttp"
-	"net"
-	"strings"
-	"text/template"
-	"time"
 )
 
 var (
@@ -31,7 +32,7 @@ $(function () { setInterval({{ .ViewID }}_sync, {{ .Interval }}); });
 function {{ .ViewID }}_sync() {
     $.ajax({
         type: "GET",
-        url: "http://{{ .Addr }}{{ .APIPath }}/{{ .Route }}",
+        url: "{{ .APIPath }}/{{ .Route }}",
         dataType: "json",
         success: function (result) {
             let opt = goecharts_{{ .ViewID }}.getOption();
@@ -70,13 +71,11 @@ func (c *Charts) genViewTemplate(vid, route string) string {
 
 	var d = struct {
 		Interval int
-		Addr     string
 		APIPath  string
 		Route    string
 		ViewID   string
 	}{
 		Interval: int(refreshInterval.Milliseconds()),
-		Addr:     c.linkAddr,
 		APIPath:  apiPath,
 		Route:    route,
 		ViewID:   vid,
@@ -139,23 +138,23 @@ type Metrics struct {
 
 type Charts struct {
 	listenAddr string
-	linkAddr   string
 	page       *components.Page
 	ln         net.Listener
 	dataFunc   func() *ChartsReport
 }
 
-func NewCharts(listenAddr string, linkAddr string, dataFunc func() *ChartsReport, desc string) (*Charts, error) {
+func NewCharts(listenAddr string, dataFunc func() *ChartsReport, desc string) (*Charts, error) {
 	templates.PageTpl = fmt.Sprintf(PageTpl, desc)
 	ln, err := net.Listen("tcp4", listenAddr)
 	if err != nil {
 		return nil, err
 	}
-	c := &Charts{listenAddr: listenAddr, linkAddr: linkAddr, ln: ln, dataFunc: dataFunc}
+
+	c := &Charts{listenAddr: listenAddr, ln: ln, dataFunc: dataFunc}
 
 	c.page = components.NewPage()
 	c.page.PageTitle = "plow"
-	c.page.AssetsHost = fmt.Sprintf("http://%s%s", linkAddr, assertsPath)
+	c.page.AssetsHost = assertsPath
 	c.page.Assets.JSAssets.Add("jquery.min.js")
 	c.page.AddCharts(c.newLatencyView(), c.newRPSView())
 
