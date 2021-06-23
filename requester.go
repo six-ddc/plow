@@ -97,8 +97,6 @@ type Requester struct {
 
 	recordChan chan *ReportRecord
 	closeOnce  sync.Once
-	report     *StreamReport
-	errCount   int64
 	wg         sync.WaitGroup
 
 	readBytes  int64
@@ -173,7 +171,7 @@ func buildRequestClient(opt *ClientOpt, r *int64, w *int64) (*fasthttp.HostClien
 		DisableHeaderNamesNormalizing: true,
 	}
 	if opt.socks5Proxy != "" {
-		if strings.Index(opt.socks5Proxy, "://") == -1 {
+		if !strings.Contains(opt.socks5Proxy, "://") {
 			opt.socks5Proxy = "socks5://" + opt.socks5Proxy
 		}
 		httpClient.Dial = fasthttpproxy.FasthttpSocksDialer(opt.socks5Proxy)
@@ -233,26 +231,25 @@ func (r *Requester) DoRequest(req *fasthttp.Request, resp *fasthttp.Response, rr
 		rr.code = ""
 		rr.error = err.Error()
 		return
-	} else {
-		switch resp.StatusCode() / 100 {
-		case 1:
-			code = "1xx"
-		case 2:
-			code = "2xx"
-		case 3:
-			code = "3xx"
-		case 4:
-			code = "4xx"
-		case 5:
-			code = "5xx"
-		}
-		err = resp.BodyWriteTo(ioutil.Discard)
-		if err != nil {
-			rr.cost = time.Since(startTime) - t1
-			rr.code = ""
-			rr.error = err.Error()
-			return
-		}
+	}
+	switch resp.StatusCode() / 100 {
+	case 1:
+		code = "1xx"
+	case 2:
+		code = "2xx"
+	case 3:
+		code = "3xx"
+	case 4:
+		code = "4xx"
+	case 5:
+		code = "5xx"
+	}
+	err = resp.BodyWriteTo(ioutil.Discard)
+	if err != nil {
+		rr.cost = time.Since(startTime) - t1
+		rr.code = ""
+		rr.error = err.Error()
+		return
 	}
 
 	rr.cost = time.Since(startTime) - t1

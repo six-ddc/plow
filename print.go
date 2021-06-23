@@ -21,7 +21,7 @@ var (
 	barEnd     = "|"
 	barSpinner = []string{"|", "/", "-", "\\"}
 	clearLine  = []byte("\r\033[K")
-	isTerminal = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsTerminal(os.Stdout.Fd())
+	isTerminal = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
 )
 
 type Printer struct {
@@ -39,7 +39,7 @@ func NewPrinter(maxNum int64, maxDuration time.Duration) *Printer {
 }
 
 func (p *Printer) updateProgressValue(rs *SnapshotReport) {
-	p.pbInc += 1
+	p.pbInc++
 	if p.maxDuration > 0 {
 		n := rs.Elapsed
 		if n > p.maxDuration {
@@ -108,6 +108,7 @@ func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Durat
 	echo(true)
 }
 
+//nolint
 const (
 	FgBlackColor int = iota + 30
 	FgRedColor
@@ -147,7 +148,7 @@ func alignBulk(bulk [][]string, aligns ...int) {
 	for _, b := range bulk {
 		for i, ali := range aligns {
 			if len(b) >= i+1 {
-				if i == len(aligns)-1 && ali == ALIGN_LEFT {
+				if i == len(aligns)-1 && ali == AlignLeft {
 					continue
 				}
 				b[i] = padString(b[i], " ", maxLen[i], ali)
@@ -228,9 +229,9 @@ func (p *Printer) buildHistogram(snapshot *SnapshotReport, useSeconds bool, isFi
 		hisBulk = append(hisBulk, row)
 	}
 	if isFinal {
-		alignBulk(hisBulk, ALIGN_LEFT, ALIGN_RIGHT, ALIGN_RIGHT)
+		alignBulk(hisBulk, AlignLeft, AlignRight, AlignRight)
 	} else {
-		alignBulk(hisBulk, ALIGN_LEFT, ALIGN_RIGHT, ALIGN_LEFT)
+		alignBulk(hisBulk, AlignLeft, AlignRight, AlignLeft)
 	}
 	return hisBulk
 }
@@ -242,9 +243,9 @@ func (p *Printer) buildPercentile(snapshot *SnapshotReport, useSeconds bool) [][
 		perc := formatFloat64(percentile.Percentile * 100)
 		percBulk[0] = append(percBulk[0], "P"+perc)
 		percBulk[1] = append(percBulk[1], durationToString(percentile.Latency, useSeconds))
-		percAligns = append(percAligns, ALIGN_CENTER)
+		percAligns = append(percAligns, AlignCenter)
 	}
-	percAligns[0] = ALIGN_LEFT
+	percAligns[0] = AlignLeft
 	alignBulk(percBulk, percAligns...)
 	return percBulk
 }
@@ -272,7 +273,7 @@ func (p *Printer) buildStats(snapshot *SnapshotReport, useSeconds bool) [][]stri
 			},
 		)
 	}
-	alignBulk(statsBulk, ALIGN_LEFT, ALIGN_CENTER, ALIGN_CENTER, ALIGN_CENTER, ALIGN_CENTER)
+	alignBulk(statsBulk, AlignLeft, AlignCenter, AlignCenter, AlignCenter, AlignCenter)
 	return statsBulk
 }
 
@@ -285,7 +286,7 @@ func (p *Printer) buildErrors(snapshot *SnapshotReport) [][]string {
 	if errorsBulks != nil {
 		sort.Slice(errorsBulks, func(i, j int) bool { return errorsBulks[i][1] < errorsBulks[j][1] })
 	}
-	alignBulk(errorsBulks, ALIGN_LEFT, ALIGN_LEFT)
+	alignBulk(errorsBulks, AlignLeft, AlignLeft)
 	return errorsBulks
 }
 
@@ -320,7 +321,7 @@ func (p *Printer) buildSummary(snapshot *SnapshotReport, isFinal bool) [][]strin
 		[]string{"Reads", fmt.Sprintf("%.3fMB/s", snapshot.ReadThroughput)},
 		[]string{"Writes", fmt.Sprintf("%.3fMB/s", snapshot.WriteThroughput)},
 	)
-	alignBulk(summarybulk, ALIGN_LEFT, ALIGN_RIGHT)
+	alignBulk(summarybulk, AlignLeft, AlignRight)
 	return summarybulk
 }
 
@@ -331,20 +332,20 @@ func displayWidth(str string) int {
 }
 
 const (
-	ALIGN_LEFT = iota
-	ALIGN_RIGHT
-	ALIGN_CENTER
+	AlignLeft = iota
+	AlignRight
+	AlignCenter
 )
 
 func padString(s, pad string, width int, align int) string {
 	gap := width - displayWidth(s)
 	if gap > 0 {
-		if align == ALIGN_LEFT {
+		if align == AlignLeft {
 			return s + strings.Repeat(pad, gap)
-		} else if align == ALIGN_RIGHT {
+		} else if align == AlignRight {
 			return strings.Repeat(pad, gap) + s
-		} else if align == ALIGN_CENTER {
-			gapLeft := int(math.Ceil(float64(gap / 2)))
+		} else if align == AlignCenter {
+			gapLeft := gap / 2
 			gapRight := gap - gapLeft
 			return strings.Repeat(pad, gapLeft) + s + strings.Repeat(pad, gapRight)
 		}

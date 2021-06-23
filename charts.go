@@ -31,7 +31,7 @@ $(function () { setInterval({{ .ViewID }}_sync, {{ .Interval }}); });
 function {{ .ViewID }}_sync() {
     $.ajax({
         type: "GET",
-        url: "http://{{ .Addr }}{{ .ApiPath }}/{{ .Route }}",
+        url: "http://{{ .Addr }}{{ .APIPath }}/{{ .Route }}",
         dataType: "json",
         success: function (result) {
             let opt = goecharts_{{ .ViewID }}.getOption();
@@ -71,13 +71,13 @@ func (c *Charts) genViewTemplate(vid, route string) string {
 	var d = struct {
 		Interval int
 		Addr     string
-		ApiPath  string
+		APIPath  string
 		Route    string
 		ViewID   string
 	}{
 		Interval: int(refreshInterval.Milliseconds()),
 		Addr:     c.linkAddr,
-		ApiPath:  apiPath,
+		APIPath:  apiPath,
 		Route:    route,
 		ViewID:   vid,
 	}
@@ -166,12 +166,12 @@ func (c *Charts) Handler(ctx *fasthttp.RequestCtx) {
 	path := string(ctx.Path())
 	switch path {
 	case assertsPath + "echarts.min.js":
-		ctx.WriteString(EchartJS)
+		_, _ = ctx.WriteString(EchartJS)
 	case assertsPath + "jquery.min.js":
-		ctx.WriteString(JqueryJS)
+		_, _ = ctx.WriteString(JqueryJS)
 	case "/":
 		ctx.SetContentType("text/html")
-		c.page.Render(ctx)
+		_ = c.page.Render(ctx)
 	default:
 		if strings.HasPrefix(path, apiPath) {
 			view := path[len(apiPath)+1:]
@@ -197,7 +197,7 @@ func (c *Charts) Handler(ctx *fasthttp.RequestCtx) {
 				Time:   time.Now().Format(timeFormat),
 				Values: values,
 			}
-			json.NewEncoder(ctx).Encode(metrics)
+			_ = json.NewEncoder(ctx).Encode(metrics)
 		} else {
 			ctx.Error("NotFound", fasthttp.StatusNotFound)
 		}
@@ -208,5 +208,5 @@ func (c *Charts) Serve() {
 	server := fasthttp.Server{
 		Handler: cors.DefaultHandler().CorsMiddleware(c.Handler),
 	}
-	server.Serve(c.ln)
+	_ = server.Serve(c.ln)
 }
