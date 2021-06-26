@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"strings"
 
@@ -23,7 +24,7 @@ var (
 	host        = kingpin.Flag("host", "Host header").String()
 	contentType = kingpin.Flag("content", "Content-Type header").Short('T').String()
 
-	chartsListenAddr = kingpin.Flag("listen", "Listen addr to serve Web UI").Default("0.0.0.0:18888").String()
+	chartsListenAddr = kingpin.Flag("listen", "Listen addr to serve Web UI").Default(":18888").String()
 	timeout          = kingpin.Flag("timeout", "Timeout for each http request").PlaceHolder("DURATION").Duration()
 	dialTimeout      = kingpin.Flag("dial-timeout", "Timeout for dial addr").PlaceHolder("DURATION").Duration()
 	reqWriteTimeout  = kingpin.Flag("req-timeout", "Timeout for full request writing").PlaceHolder("DURATION").Duration()
@@ -102,8 +103,14 @@ Example:
 	desc += fmt.Sprintf(" using %d connection(s).", *concurrency)
 	fmt.Println(desc)
 
+	var ln net.Listener
 	if *chartsListenAddr != "" {
-		fmt.Printf("@ Real-time charts is listening on http://%s\n", *chartsListenAddr)
+		ln, err = net.Listen("tcp", *chartsListenAddr)
+		if err != nil {
+			errAndExit(err.Error())
+			return
+		}
+		fmt.Printf("@ Real-time charts is listening on http://%s\n", ln.Addr().String())
 	}
 	fmt.Printf("\n")
 
@@ -117,8 +124,8 @@ Example:
 	report := NewStreamReport()
 	go report.Collect(requester.RecordChan())
 
-	if *chartsListenAddr != "" {
-		charts, err := NewCharts(*chartsListenAddr, report.Charts, desc)
+	if ln != nil {
+		charts, err := NewCharts(ln, report.Charts, desc)
 		if err != nil {
 			errAndExit(err.Error())
 			return

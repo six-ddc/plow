@@ -140,21 +140,15 @@ type Metrics struct {
 }
 
 type Charts struct {
-	listenAddr string
-	page       *components.Page
-	ln         net.Listener
-	dataFunc   func() *ChartsReport
+	page     *components.Page
+	ln       net.Listener
+	dataFunc func() *ChartsReport
 }
 
-func NewCharts(listenAddr string, dataFunc func() *ChartsReport, desc string) (*Charts, error) {
+func NewCharts(ln net.Listener, dataFunc func() *ChartsReport, desc string) (*Charts, error) {
 	templates.PageTpl = fmt.Sprintf(PageTpl, desc)
-	ln, err := net.Listen("tcp4", listenAddr)
-	if err != nil {
-		return nil, err
-	}
 
-	c := &Charts{listenAddr: listenAddr, ln: ln, dataFunc: dataFunc}
-
+	c := &Charts{ln: ln, dataFunc: dataFunc}
 	c.page = components.NewPage()
 	c.page.PageTitle = "plow"
 	c.page.AssetsHost = assertsPath
