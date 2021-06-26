@@ -70,12 +70,13 @@ assets page.
 ### Via Go
 
 ```bash
-go get github.com/six-ddc/plow
+go get -u github.com/six-ddc/plow
 ```
 
 ### Via Homebrew
 
 ```sh
+# brew update
 brew install plow
 ```
 
@@ -137,7 +138,7 @@ plow http://127.0.0.1:8080/ -c 20 -n 10000 -d 10s
 POST a json file:
 
 ```bash
-plow http://127.0.0.1:8080/ -c 20 --body @file.json -T 'application/json' -m POST
+plow https://httpbin.org/post -c 20 --body @file.json -T 'application/json' -m POST
 ```
 
 ## Stargazers
