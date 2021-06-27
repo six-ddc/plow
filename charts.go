@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -12,6 +13,7 @@ import (
 	"text/template"
 	"time"
 
+	_ "embed"
 	cors "github.com/AdhityaRamadhanus/fasthttpcors"
 	"github.com/go-echarts/go-echarts/v2/charts"
 	"github.com/go-echarts/go-echarts/v2/components"
@@ -20,9 +22,13 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+//go:embed echarts.min.js
+//go:embed jquery.min.js
+var assetsFS embed.FS
+
 var (
-	assertsPath     = "/echarts/statics/"
-	apiPath         = "/data"
+	assetsPath      = "/echarts/statics/"
+	apiPath         = "/data/"
 	latencyView     = "latency"
 	rpsView         = "rps"
 	timeFormat      = "15:04:05"
@@ -35,7 +41,7 @@ $(function () { setInterval({{ .ViewID }}_sync, {{ .Interval }}); });
 function {{ .ViewID }}_sync() {
     $.ajax({
         type: "GET",
-        url: "{{ .APIPath }}/{{ .Route }}",
+        url: "{{ .APIPath }}{{ .Route }}",
         dataType: "json",
         success: function (result) {
             let opt = goecharts_{{ .ViewID }}.getOption();
@@ -151,7 +157,7 @@ func NewCharts(ln net.Listener, dataFunc func() *ChartsReport, desc string) (*Ch
 	c := &Charts{ln: ln, dataFunc: dataFunc}
 	c.page = components.NewPage()
 	c.page.PageTitle = "plow"
-	c.page.AssetsHost = assertsPath
+	c.page.AssetsHost = assetsPath
 	c.page.Assets.JSAssets.Add("jquery.min.js")
 	c.page.AddCharts(c.newLatencyView(), c.newRPSView())
 
@@ -160,43 +166,44 @@ func NewCharts(ln net.Listener, dataFunc func() *ChartsReport, desc string) (*Ch
 
 func (c *Charts) Handler(ctx *fasthttp.RequestCtx) {
 	path := string(ctx.Path())
-	switch path {
-	case assertsPath + "echarts.min.js":
-		_, _ = ctx.WriteString(EchartJS)
-	case assertsPath + "jquery.min.js":
-		_, _ = ctx.WriteString(JqueryJS)
-	case "/":
+	if strings.HasPrefix(path, apiPath) {
+		view := path[len(apiPath):]
+		var values []interface{}
+		reportData := c.dataFunc()
+		switch view {
+		case latencyView:
+			if reportData != nil {
+				values = append(values, reportData.Latency.min/1e6)
+				values = append(values, reportData.Latency.Mean()/1e6)
+				values = append(values, reportData.Latency.max/1e6)
+			} else {
+				values = append(values, nil, nil, nil)
+			}
+		case rpsView:
+			if reportData != nil {
+				values = append(values, reportData.RPS)
+			} else {
+				values = append(values, nil)
+			}
+		}
+		metrics := &Metrics{
+			Time:   time.Now().Format(timeFormat),
+			Values: values,
+		}
+		_ = json.NewEncoder(ctx).Encode(metrics)
+	} else if path == "/" {
 		ctx.SetContentType("text/html")
 		_ = c.page.Render(ctx)
-	default:
-		if strings.HasPrefix(path, apiPath) {
-			view := path[len(apiPath)+1:]
-			var values []interface{}
-			reportData := c.dataFunc()
-			switch view {
-			case latencyView:
-				if reportData != nil {
-					values = append(values, reportData.Latency.min/1e6)
-					values = append(values, reportData.Latency.Mean()/1e6)
-					values = append(values, reportData.Latency.max/1e6)
-				} else {
-					values = append(values, nil, nil, nil)
-				}
-			case rpsView:
-				if reportData != nil {
-					values = append(values, reportData.RPS)
-				} else {
-					values = append(values, nil)
-				}
-			}
-			metrics := &Metrics{
-				Time:   time.Now().Format(timeFormat),
-				Values: values,
-			}
-			_ = json.NewEncoder(ctx).Encode(metrics)
+	} else if strings.HasPrefix(path, assetsPath) {
+		ap := path[len(assetsPath):]
+		f, err := assetsFS.Open(ap)
+		if err != nil {
+			ctx.Error(err.Error(), 404)
 		} else {
-			ctx.Error("NotFound", fasthttp.StatusNotFound)
+			ctx.SetBodyStream(f, -1)
 		}
+	} else {
+		ctx.Error("NotFound", fasthttp.StatusNotFound)
 	}
 }
 
