@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpproxy"
@@ -112,6 +113,10 @@ type ClientOpt struct {
 	bodyBytes []byte
 	bodyFile  string
 
+	certPath string
+	keyPath  string
+	insecure bool
+
 	maxConns     int
 	doTimeout    time.Duration
 	readTimeout  time.Duration
@@ -156,6 +161,21 @@ func addMissingPort(addr string, isTLS bool) string {
 	return net.JoinHostPort(addr, strconv.Itoa(port))
 }
 
+func buildTLSConfig(opt *ClientOpt) (*tls.Config, error) {
+	var certs []tls.Certificate
+	if opt.certPath != "" && opt.keyPath != "" {
+		c, err := tls.LoadX509KeyPair(opt.certPath, opt.keyPath)
+		if err != nil {
+			return nil, err
+		}
+		certs = append(certs, c)
+	}
+	return &tls.Config{
+		InsecureSkipVerify: opt.insecure,
+		Certificates:       certs,
+	}, nil
+}
+
 func buildRequestClient(opt *ClientOpt, r *int64, w *int64) (*fasthttp.HostClient, *fasthttp.RequestHeader, error) {
 	u, err := url2.Parse(opt.url)
 	if err != nil {
@@ -179,6 +199,12 @@ func buildRequestClient(opt *ClientOpt, r *int64, w *int64) (*fasthttp.HostClien
 		httpClient.Dial = fasthttpproxy.FasthttpProxyHTTPDialerTimeout(opt.dialTimeout)
 	}
 	httpClient.Dial = ThroughputInterceptorDial(httpClient.Dial, r, w)
+
+	tlsConfig, err := buildTLSConfig(opt)
+	if err != nil {
+		return nil, nil, err
+	}
+	httpClient.TLSConfig = tlsConfig
 
 	var requestHeader fasthttp.RequestHeader
 	if opt.contentType != "" {

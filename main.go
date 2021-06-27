@@ -23,6 +23,9 @@ var (
 	headers     = kingpin.Flag("header", "Custom HTTP headers").Short('H').PlaceHolder("K:V").Strings()
 	host        = kingpin.Flag("host", "Host header").String()
 	contentType = kingpin.Flag("content", "Content-Type header").Short('T').String()
+	cert        = kingpin.Flag("cert", "Path to the client's TLS Certificate").ExistingFile()
+	key         = kingpin.Flag("key", "Path to the client's TLS Certificate Private Key").ExistingFile()
+	insecure    = kingpin.Flag("insecure", "Controls whether a client verifies the server's certificate chain and host name").Short('k').Bool()
 
 	chartsListenAddr = kingpin.Flag("listen", "Listen addr to serve Web UI").Default(":18888").String()
 	timeout          = kingpin.Flag("timeout", "Timeout for each http request").PlaceHolder("DURATION").Duration()
@@ -31,25 +34,84 @@ var (
 	respReadTimeout  = kingpin.Flag("resp-timeout", "Timeout for full response reading").PlaceHolder("DURATION").Duration()
 	socks5           = kingpin.Flag("socks5", "Socks5 proxy").PlaceHolder("ip:port").String()
 
+	autoOpenBrowser = kingpin.Flag("auto-open-browser", "Specify whether auto open browser to show Web charts").Bool()
+
 	url = kingpin.Arg("url", "request url").Required().String()
 )
 
 func errAndExit(msg string) {
-	fmt.Fprintln(os.Stderr, msg)
+	fmt.Fprintln(os.Stderr, "plow: "+msg)
 	os.Exit(1)
 }
 
-func main() {
-	kingpin.UsageTemplate(kingpin.CompactUsageTemplate).Version("1.0.0").Author("six-ddc@github")
-	kingpin.CommandLine.Help = `A high-performance HTTP benchmarking tool with real-time web UI and terminal displaying
+var CompactUsageTemplate = `{{define "FormatCommand" -}}
+{{if .FlagSummary}} {{.FlagSummary}}{{end -}}
+{{range .Args}} {{if not .Required}}[{{end}}<{{.Name}}>{{if .Value|IsCumulative}} ...{{end}}{{if not .Required}}]{{end}}{{end -}}
+{{end -}}
 
-Example:
+{{define "FormatCommandList" -}}
+{{range . -}}
+{{if not .Hidden -}}
+{{.Depth|Indent}}{{.Name}}{{if .Default}}*{{end}}{{template "FormatCommand" .}}
+{{end -}}
+{{template "FormatCommandList" .Commands -}}
+{{end -}}
+{{end -}}
+
+{{define "FormatUsage" -}}
+{{template "FormatCommand" .}}{{if .Commands}} <command> [<args> ...]{{end}}
+{{if .Help}}
+{{.Help|Wrap 0 -}}
+{{end -}}
+
+{{end -}}
+
+{{if .Context.SelectedCommand -}}
+{{T "usage:"}} {{.App.Name}} {{template "FormatUsage" .Context.SelectedCommand}}
+{{else -}}
+{{T "usage:"}} {{.App.Name}}{{template "FormatUsage" .App}}
+{{end -}}
+Examples:
+
   plow http://127.0.0.1:8080/ -c 20 -n 100000
   plow https://httpbin.org/post -c 20 -d 5m --body @file.json -T 'application/json' -m POST
+
+{{if .Context.Flags -}}
+{{T "Flags:"}}
+{{.Context.Flags|FlagsToTwoColumns|FormatTwoColumns}}
+  Flags default values also read from env PLOW_SOME_FLAG, such as PLOW_TIMEOUT=5s equals to --timeout=5s
+
+{{end -}}
+{{if .Context.Args -}}
+{{T "Args:"}}
+{{.Context.Args|ArgsToTwoColumns|FormatTwoColumns}}
+{{end -}}
+{{if .Context.SelectedCommand -}}
+{{if .Context.SelectedCommand.Commands -}}
+{{T "Commands:"}}
+  {{.Context.SelectedCommand}}
+{{.Context.SelectedCommand.Commands|CommandsToTwoColumns|FormatTwoColumns}}
+{{end -}}
+{{else if .App.Commands -}}
+{{T "Commands:"}}
+{{.App.Commands|CommandsToTwoColumns|FormatTwoColumns}}
+{{end -}}
 `
+
+func main() {
+	kingpin.UsageTemplate(CompactUsageTemplate).
+		Version("1.0.0").
+		Author("six-ddc@github").
+		Resolver(kingpin.PrefixedEnvarResolver("PLOW_", ";")).
+		Help = `A high-performance HTTP benchmarking tool with real-time web UI and terminal displaying`
 	kingpin.Parse()
+
 	if *requests >= 0 && *requests < int64(*concurrency) {
 		errAndExit("requests must greater than or equal concurrency")
+		return
+	}
+	if (*cert != "" && *key == "") || (*cert == "" && *key != "") {
+		errAndExit("must specify cert and key at the same time")
 		return
 	}
 
@@ -76,11 +138,16 @@ Example:
 	}
 
 	clientOpt := ClientOpt{
-		url:          *url,
-		method:       *method,
-		headers:      *headers,
-		bodyBytes:    bodyBytes,
-		bodyFile:     bodyFile,
+		url:       *url,
+		method:    *method,
+		headers:   *headers,
+		bodyBytes: bodyBytes,
+		bodyFile:  bodyFile,
+
+		certPath: *cert,
+		keyPath:  *key,
+		insecure: *insecure,
+
 		maxConns:     *concurrency,
 		doTimeout:    *timeout,
 		readTimeout:  *respReadTimeout,
@@ -92,6 +159,13 @@ Example:
 		host:        *host,
 	}
 
+	requester, err := NewRequester(*concurrency, *requests, *duration, &clientOpt)
+	if err != nil {
+		errAndExit(err.Error())
+		return
+	}
+
+	// description
 	var desc string
 	desc = fmt.Sprintf("Benchmarking %s", *url)
 	if *requests > 0 {
@@ -103,6 +177,7 @@ Example:
 	desc += fmt.Sprintf(" using %d connection(s).", *concurrency)
 	fmt.Println(desc)
 
+	// charts listener
 	var ln net.Listener
 	if *chartsListenAddr != "" {
 		ln, err = net.Listen("tcp", *chartsListenAddr)
@@ -114,25 +189,24 @@ Example:
 	}
 	fmt.Printf("\n")
 
-	requester, err := NewRequester(*concurrency, *requests, *duration, &clientOpt)
-	if err != nil {
-		errAndExit(err.Error())
-		return
-	}
+	// do request
 	go requester.Run()
 
+	// metrics collection
 	report := NewStreamReport()
 	go report.Collect(requester.RecordChan())
 
 	if ln != nil {
+		// serve charts data
 		charts, err := NewCharts(ln, report.Charts, desc)
 		if err != nil {
 			errAndExit(err.Error())
 			return
 		}
-		go charts.Serve()
+		go charts.Serve(*autoOpenBrowser)
 	}
 
+	// terminal printer
 	printer := NewPrinter(*requests, *duration)
 	printer.PrintLoop(report.Snapshot, *interval, *seconds, report.Done())
 }

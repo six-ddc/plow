@@ -200,11 +200,13 @@ func (c *Charts) Handler(ctx *fasthttp.RequestCtx) {
 	}
 }
 
-func (c *Charts) Serve() {
+func (c *Charts) Serve(open bool) {
 	server := fasthttp.Server{
 		Handler: cors.DefaultHandler().CorsMiddleware(c.Handler),
 	}
-	go openBrowser("http://" + c.ln.Addr().String())
+	if open {
+		go openBrowser("http://" + c.ln.Addr().String())
+	}
 	_ = server.Serve(c.ln)
 }
 
