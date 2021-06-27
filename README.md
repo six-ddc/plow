@@ -22,7 +22,7 @@ additional performance overhead for benchmarking.
 ```text
 ❯ ./plow http://127.0.0.1:8080/hello -c 20
 Benchmarking http://127.0.0.1:8080/hello using 20 connection(s).
-> Real-time charts is listening on http://127.0.0.1:18888/
+@ Real-time charts is listening on http://[::]:18888
 
 Summary:
   Elapsed        8.6s
@@ -96,32 +96,37 @@ usage: plow [<flags>] <url>
 
 A high-performance HTTP benchmarking tool with real-time web UI and terminal displaying
 
-Example:
+Examples:
 
   plow http://127.0.0.1:8080/ -c 20 -n 100000
   plow https://httpbin.org/post -c 20 -d 5m --body @file.json -T 'application/json' -m POST
 
 Flags:
-      --help                    Show context-sensitive help.
-  -c, --concurrency=1           Number of connections to run concurrently
-  -n, --requests=-1             Number of requests to run
-  -d, --duration=DURATION       Duration of test, examples: -d 10s -d 3m
-  -i, --interval=200ms          Print snapshot result every interval, use 0 to print once at the end
-      --seconds                 Use seconds as time unit to print
-      --body=BODY               HTTP request body, if start the body with @, the rest should be a filename to read
-      --stream                  Specify whether to stream file specified by '--body @file' using chunked encoding or to read into memory
-  -m, --method="GET"            HTTP method
-  -H, --header=K:V ...          Custom HTTP headers
-      --host=HOST               Host header
-  -T, --content=CONTENT         Content-Type header
-      --listen=":18888"         Listen addr to serve Web UI
-      --link="127.0.0.1:18888"  Link addr used for show Web html and request backend server
-      --timeout=DURATION        Timeout for each http request
-      --dial-timeout=DURATION   Timeout for dial addr
-      --req-timeout=DURATION    Timeout for full request writing
-      --resp-timeout=DURATION   Timeout for full response reading
-      --socks5=ip:port          Socks5 proxy
-      --version                 Show application version.
+      --help                   Show context-sensitive help.
+  -c, --concurrency=1          Number of connections to run concurrently
+  -n, --requests=-1            Number of requests to run
+  -d, --duration=DURATION      Duration of test, examples: -d 10s -d 3m
+  -i, --interval=200ms         Print snapshot result every interval, use 0 to print once at the end
+      --seconds                Use seconds as time unit to print
+      --body=BODY              HTTP request body, if start the body with @, the rest should be a filename to read
+      --stream                 Specify whether to stream file specified by '--body @file' using chunked encoding or to read into memory
+  -m, --method="GET"           HTTP method
+  -H, --header=K:V ...         Custom HTTP headers
+      --host=HOST              Host header
+  -T, --content=CONTENT        Content-Type header
+      --cert=CERT              Path to the client's TLS Certificate
+      --key=KEY                Path to the client's TLS Certificate Private Key
+  -k, --insecure               Controls whether a client verifies the server's certificate chain and host name
+      --listen=":18888"        Listen addr to serve Web UI
+      --timeout=DURATION       Timeout for each http request
+      --dial-timeout=DURATION  Timeout for dial addr
+      --req-timeout=DURATION   Timeout for full request writing
+      --resp-timeout=DURATION  Timeout for full response reading
+      --socks5=ip:port         Socks5 proxy
+      --auto-open-browser      Specify whether auto open browser to show Web charts
+      --version                Show application version.
+
+  Flags default values also read from env PLOW_SOME_FLAG, such as PLOW_TIMEOUT=5s equals to --timeout=5s
 
 Args:
   <url>  request url
