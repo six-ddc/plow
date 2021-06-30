@@ -100,7 +100,7 @@ Examples:
 
 func main() {
 	kingpin.UsageTemplate(CompactUsageTemplate).
-		Version("1.0.0").
+		Version("1.1.0").
 		Author("six-ddc@github").
 		Resolver(kingpin.PrefixedEnvarResolver("PLOW_", ";")).
 		Help = `A high-performance HTTP benchmarking tool with real-time web UI and terminal displaying`
