@@ -17,7 +17,7 @@ var (
 	interval    = kingpin.Flag("interval", "Print snapshot result every interval, use 0 to print once at the end").Short('i').Default("200ms").Duration()
 	seconds     = kingpin.Flag("seconds", "Use seconds as time unit to print").Bool()
 
-	body        = kingpin.Flag("body", "HTTP request body, if start the body with @, the rest should be a filename to read").String()
+	body        = kingpin.Flag("body", "HTTP request body, if start the body with @, the rest should be a filename to read").Short('b').String()
 	stream      = kingpin.Flag("stream", "Specify whether to stream file specified by '--body @file' using chunked encoding or to read into memory").Default("false").Bool()
 	method      = kingpin.Flag("method", "HTTP method").Default("GET").Short('m').String()
 	headers     = kingpin.Flag("header", "Custom HTTP headers").Short('H').PlaceHolder("K:V").Strings()

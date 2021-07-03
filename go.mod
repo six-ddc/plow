@@ -16,6 +16,8 @@ require (
 	github.com/valyala/fasthttp v1.27.0
 	go.uber.org/automaxprocs v1.4.0
 	golang.org/x/net v0.0.0-20210525063256-abc453219eb5 // indirect
+	golang.org/x/sys v0.0.0-20210603081109-ebe580a85c40 // indirect
 	gopkg.in/alecthomas/kingpin.v3-unstable v3.0.0-20191105091915-95d230a53780
+	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

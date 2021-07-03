@@ -108,7 +108,7 @@ Flags:
   -d, --duration=DURATION      Duration of test, examples: -d 10s -d 3m
   -i, --interval=200ms         Print snapshot result every interval, use 0 to print once at the end
       --seconds                Use seconds as time unit to print
-      --body=BODY              HTTP request body, if start the body with @, the rest should be a filename to read
+  -b, --body=BODY              HTTP request body, if start the body with @, the rest should be a filename to read
       --stream                 Specify whether to stream file specified by '--body @file' using chunked encoding or to read into memory
   -m, --method="GET"           HTTP method
   -H, --header=K:V ...         Custom HTTP headers
@@ -144,6 +144,15 @@ POST a json file:
 
 ```bash
 plow https://httpbin.org/post -c 20 --body @file.json -T 'application/json' -m POST
+```
+
+### Bash/ZSH Shell Completion
+
+```bash
+# Add the statement to their bash_profile (or equivalent):
+eval "$(plow --completion-script-bash)"
+# Or for ZSH
+eval "$(plow --completion-script-zsh)"
 ```
 
 ## Stargazers
