@@ -32,10 +32,11 @@ type Printer struct {
 	pbInc       int64
 	pbNumStr    string
 	pbDurStr    string
+	notClearBar bool
 }
 
-func NewPrinter(maxNum int64, maxDuration time.Duration) *Printer {
-	return &Printer{maxNum: maxNum, maxDuration: maxDuration}
+func NewPrinter(maxNum int64, maxDuration time.Duration, notClearBar bool) *Printer {
+	return &Printer{maxNum: maxNum, maxDuration: maxDuration, notClearBar: notClearBar}
 }
 
 func (p *Printer) updateProgressValue(rs *SnapshotReport) {
@@ -219,7 +220,8 @@ func (p *Printer) buildHistogram(snapshot *SnapshotReport, useSeconds bool, isFi
 		row := []string{durationToString(bin.Mean, useSeconds), strconv.Itoa(bin.Count)}
 		if isFinal {
 			row = append(row, fmt.Sprintf("%.2f%%", math.Floor(float64(bin.Count)*1e4/float64(hisSum)+0.5)/100.0))
-		} else {
+		}
+		if !isFinal || p.notClearBar {
 			barLen := 0
 			if maxCount > 0 {
 				barLen = (bin.Count*maxBarLen + maxCount/2) / maxCount
