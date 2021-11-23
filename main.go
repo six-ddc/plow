@@ -35,7 +35,7 @@ var (
 	socks5           = kingpin.Flag("socks5", "Socks5 proxy").PlaceHolder("ip:port").String()
 
 	autoOpenBrowser = kingpin.Flag("auto-open-browser", "Specify whether auto open browser to show Web charts").Bool()
-	notClearBar     = kingpin.Flag("not-clear", "Don't clear the histogram bar once its finished").Bool()
+	clean           = kingpin.Flag("clean", "Clean the histogram bar once its finished. Default is true").Default("true").NegatableBool()
 
 	url = kingpin.Arg("url", "request url").Required().String()
 )
@@ -208,6 +208,6 @@ func main() {
 	}
 
 	// terminal printer
-	printer := NewPrinter(*requests, *duration, *notClearBar)
+	printer := NewPrinter(*requests, *duration, !*clean)
 	printer.PrintLoop(report.Snapshot, *interval, *seconds, report.Done())
 }
