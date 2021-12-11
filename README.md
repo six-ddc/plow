@@ -70,7 +70,7 @@ assets page.
 ### Via Go
 
 ```bash
-go get -u github.com/six-ddc/plow
+go install github.com/six-ddc/plow@latest
 ```
 
 ### Via Homebrew
