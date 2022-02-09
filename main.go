@@ -36,8 +36,8 @@ var (
 
 	autoOpenBrowser = kingpin.Flag("auto-open-browser", "Specify whether auto open browser to show Web charts").Bool()
 	clean           = kingpin.Flag("clean", "Clean the histogram bar once its finished. Default is true").Default("true").NegatableBool()
-
-	url = kingpin.Arg("url", "request url").Required().String()
+	summary         = kingpin.Flag("summary", "Only print the summary without realtime reports").Default("false").NegatableBool()
+	url             = kingpin.Arg("url", "request url").Required().String()
 )
 
 func errAndExit(msg string) {
@@ -166,6 +166,11 @@ func main() {
 		return
 	}
 
+	outStream := os.Stdout
+	if *summary {
+		outStream = os.Stderr
+		isTerminal = false
+	}
 	// description
 	var desc string
 	desc = fmt.Sprintf("Benchmarking %s", *url)
@@ -176,7 +181,7 @@ func main() {
 		desc += fmt.Sprintf(" for %s", duration.String())
 	}
 	desc += fmt.Sprintf(" using %d connection(s).", *concurrency)
-	fmt.Println(desc)
+	fmt.Fprintln(outStream,desc)
 
 	// charts listener
 	var ln net.Listener
@@ -186,9 +191,9 @@ func main() {
 			errAndExit(err.Error())
 			return
 		}
-		fmt.Printf("@ Real-time charts is listening on http://%s\n", ln.Addr().String())
+		fmt.Fprintln(outStream,"@ Real-time charts is listening on http://%s", ln.Addr().String())
 	}
-	fmt.Printf("\n")
+	fmt.Fprintln(outStream,"")
 
 	// do request
 	go requester.Run()
@@ -208,6 +213,7 @@ func main() {
 	}
 
 	// terminal printer
-	printer := NewPrinter(*requests, *duration, !*clean)
+	printer := NewPrinter(*requests, *duration, !*clean, *summary)
 	printer.PrintLoop(report.Snapshot, *interval, *seconds, report.Done())
+
 }

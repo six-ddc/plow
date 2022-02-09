@@ -33,10 +33,11 @@ type Printer struct {
 	pbNumStr    string
 	pbDurStr    string
 	noClean     bool
+	summary     bool
 }
 
-func NewPrinter(maxNum int64, maxDuration time.Duration, noCleanBar bool) *Printer {
-	return &Printer{maxNum: maxNum, maxDuration: maxDuration, noClean: noCleanBar}
+func NewPrinter(maxNum int64, maxDuration time.Duration, noCleanBar, summary bool) *Printer {
+	return &Printer{maxNum: maxNum, maxDuration: maxDuration, noClean: noCleanBar, summary: summary}
 }
 
 func (p *Printer) updateProgressValue(rs *SnapshotReport) {
@@ -66,6 +67,10 @@ func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Durat
 	var buf bytes.Buffer
 
 	var backCursor string
+	cl := clearLine
+	if p.summary {
+		cl = nil
+	}
 	echo := func(isFinal bool) {
 		report := snapshot()
 		p.updateProgressValue(report)
@@ -77,12 +82,12 @@ func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Durat
 		for {
 			i := bytes.IndexByte(result, '\n')
 			if i == -1 {
-				os.Stdout.Write(clearLine)
+				os.Stdout.Write(cl)
 				os.Stdout.Write(result)
 				break
 			}
 			n++
-			os.Stdout.Write(clearLine)
+			os.Stdout.Write(cl)
 			os.Stdout.Write(result[:i])
 			os.Stdout.Write([]byte("\n"))
 			result = result[i+1:]
@@ -97,7 +102,9 @@ func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Durat
 		for {
 			select {
 			case <-ticker.C:
-				echo(false)
+				if !p.summary {
+					echo(false)
+				}
 			case <-doneChan:
 				ticker.Stop()
 				break loop
