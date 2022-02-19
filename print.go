@@ -68,7 +68,7 @@ func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Durat
 
 	var backCursor string
 	cl := clearLine
-	if p.summary {
+	if p.summary || interval == 0 {
 		cl = nil
 	}
 	echo := func(isFinal bool) {

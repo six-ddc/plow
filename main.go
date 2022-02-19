@@ -181,7 +181,7 @@ func main() {
 		desc += fmt.Sprintf(" for %s", duration.String())
 	}
 	desc += fmt.Sprintf(" using %d connection(s).", *concurrency)
-	fmt.Fprintln(outStream,desc)
+	fmt.Fprintln(outStream, desc)
 
 	// charts listener
 	var ln net.Listener
@@ -191,9 +191,9 @@ func main() {
 			errAndExit(err.Error())
 			return
 		}
-		fmt.Fprintln(outStream,"@ Real-time charts is listening on http://%s", ln.Addr().String())
+		fmt.Fprintf(outStream, "@ Real-time charts is listening on http://%s\n", ln.Addr().String())
 	}
-	fmt.Fprintln(outStream,"")
+	fmt.Fprintln(outStream, "")
 
 	// do request
 	go requester.Run()
