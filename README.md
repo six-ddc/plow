@@ -124,6 +124,7 @@ Flags:
       --resp-timeout=DURATION  Timeout for full response reading
       --socks5=ip:port         Socks5 proxy
       --auto-open-browser      Specify whether auto open browser to show Web charts
+      --[no-]summary           Only print the summary without realtime reports
       --[no-]clean             Clean the histogram bar once its finished. Default is true
       --version                Show application version.
 
