@@ -11,7 +11,7 @@ require (
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mattn/go-runewidth v0.0.13
 	github.com/nicksnyder/go-i18n v1.10.1 // indirect
-	github.com/valyala/fasthttp v1.33.0
+	github.com/valyala/fasthttp v1.36.0
 	go.uber.org/automaxprocs v1.4.0
 	gopkg.in/alecthomas/kingpin.v3-unstable v3.0.0-20191105091915-95d230a53780
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
