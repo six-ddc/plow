@@ -5,7 +5,7 @@
 [![GitHub license](https://img.shields.io/github/license/six-ddc/plow.svg)](https://github.com/six-ddc/plow/blob/main/LICENSE)
 [![made-with-Go](https://img.shields.io/badge/Made%20with-Go-1f425f.svg)](http://golang.org)
 
-Plow is a HTTP(S) benchmarking tool, written in Golang. It uses
+Plow is an HTTP(S) benchmarking tool, written in Golang. It uses
 excellent [fasthttp](https://github.com/valyala/fasthttp#http-client-comparison-with-nethttp) instead of Go's default
 net/http due to its lightning fast performance.
 
@@ -104,6 +104,7 @@ Examples:
 Flags:
       --help                   Show context-sensitive help.
   -c, --concurrency=1          Number of connections to run concurrently
+      --rate=infinity          Number of requests per time unit, examples: --rate 50 --rate 10/ms
   -n, --requests=-1            Number of requests to run
   -d, --duration=DURATION      Duration of test, examples: -d 10s -d 3m
   -i, --interval=200ms         Print snapshot result every interval, use 0 to print once at the end
@@ -124,8 +125,8 @@ Flags:
       --resp-timeout=DURATION  Timeout for full response reading
       --socks5=ip:port         Socks5 proxy
       --auto-open-browser      Specify whether auto open browser to show Web charts
-      --[no-]summary           Only print the summary without realtime reports
       --[no-]clean             Clean the histogram bar once its finished. Default is true
+      --[no-]summary           Only print the summary without realtime reports
       --version                Show application version.
 
   Flags default values also read from env PLOW_SOME_FLAG, such as PLOW_TIMEOUT=5s equals to --timeout=5s

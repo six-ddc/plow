@@ -7,6 +7,7 @@ import (
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpproxy"
 	"go.uber.org/automaxprocs/maxprocs"
+	"golang.org/x/time/rate"
 	"io/ioutil"
 	"net"
 	url2 "net/url"
@@ -90,6 +91,7 @@ func ThroughputInterceptorDial(dial fasthttp.DialFunc, r *int64, w *int64) fasth
 
 type Requester struct {
 	concurrency int
+	reqRate     *rate.Limit
 	requests    int64
 	duration    time.Duration
 	clientOpt   *ClientOpt
@@ -128,13 +130,14 @@ type ClientOpt struct {
 	host        string
 }
 
-func NewRequester(concurrency int, requests int64, duration time.Duration, clientOpt *ClientOpt) (*Requester, error) {
+func NewRequester(concurrency int, requests int64, duration time.Duration, reqRate *rate.Limit, clientOpt *ClientOpt) (*Requester, error) {
 	maxResult := concurrency * 100
 	if maxResult > 8192 {
 		maxResult = 8192
 	}
 	r := &Requester{
 		concurrency: concurrency,
+		reqRate:     reqRate,
 		requests:    requests,
 		duration:    duration,
 		clientOpt:   clientOpt,
@@ -304,6 +307,11 @@ func (r *Requester) Run() {
 		})
 	}
 
+	var limiter *rate.Limiter
+	if r.reqRate != nil {
+		limiter = rate.NewLimiter(*r.reqRate, 1)
+	}
+
 	semaphore := r.requests
 	for i := 0; i < r.concurrency; i++ {
 		r.wg.Add(1)
@@ -328,6 +336,13 @@ func (r *Requester) Run() {
 				case <-ctx.Done():
 					return
 				default:
+				}
+
+				if limiter != nil {
+					err := limiter.Wait(ctx)
+					if err != nil {
+						continue
+					}
 				}
 
 				if r.requests > 0 && atomic.AddInt64(&semaphore, -1) < 0 {

@@ -13,6 +13,7 @@ require (
 	github.com/nicksnyder/go-i18n v1.10.1 // indirect
 	github.com/valyala/fasthttp v1.33.0
 	go.uber.org/automaxprocs v1.4.0
+	golang.org/x/time v0.0.0-20220411224347-583f2d630306
 	gopkg.in/alecthomas/kingpin.v3-unstable v3.0.0-20191105091915-95d230a53780
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

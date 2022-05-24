@@ -2,16 +2,20 @@ package main
 
 import (
 	"fmt"
+	"golang.org/x/time/rate"
 	"io/ioutil"
 	"net"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/alecthomas/kingpin.v3-unstable"
 )
 
 var (
 	concurrency = kingpin.Flag("concurrency", "Number of connections to run concurrently").Short('c').Default("1").Int()
+	reqRate     = rateFlag(kingpin.Flag("rate", "Number of requests per time unit, examples: --rate 50 --rate 10/ms").Default("infinity"))
 	requests    = kingpin.Flag("requests", "Number of requests to run").Short('n').Default("-1").Int64()
 	duration    = kingpin.Flag("duration", "Duration of test, examples: -d 10s -d 3m").Short('d').PlaceHolder("DURATION").Duration()
 	interval    = kingpin.Flag("interval", "Print snapshot result every interval, use 0 to print once at the end").Short('i').Default("200ms").Duration()
@@ -99,9 +103,71 @@ Examples:
 {{end -}}
 `
 
+type rateFlagValue struct {
+	infinity bool
+	limit    rate.Limit
+	v        string
+}
+
+func (f *rateFlagValue) Set(v string) error {
+	if v == "infinity" {
+		f.infinity = true
+		return nil
+	}
+
+	retErr := fmt.Errorf("--rate format %q doesn't match the \"freq/duration\" (i.e. 50/1s)", v)
+	ps := strings.SplitN(v, "/", 2)
+	switch len(ps) {
+	case 1:
+		ps = append(ps, "1s")
+	case 0:
+		return retErr
+	}
+
+	freq, err := strconv.Atoi(ps[0])
+	if err != nil {
+		return retErr
+	}
+	if freq == 0 {
+		f.infinity = true
+		return nil
+	}
+
+	switch ps[1] {
+	case "ns", "us", "µs", "ms", "s", "m", "h":
+		ps[1] = "1" + ps[1]
+	}
+
+	per, err := time.ParseDuration(ps[1])
+	if err != nil {
+		return retErr
+	}
+
+	f.limit = rate.Limit(float64(freq) / per.Seconds())
+	f.v = v
+	return nil
+}
+
+func (f *rateFlagValue) Limit() *rate.Limit {
+	if f.infinity {
+		return nil
+	}
+	return &f.limit
+}
+
+func (f *rateFlagValue) String() string {
+	return f.v
+}
+
+func rateFlag(c *kingpin.Clause) (target *rateFlagValue) {
+	target = new(rateFlagValue)
+	c.SetValue(target)
+	return
+}
+
 func main() {
 	kingpin.UsageTemplate(CompactUsageTemplate).
-		Version("1.1.0").
+		Version("1.2.0").
 		Author("six-ddc@github").
 		Resolver(kingpin.PrefixedEnvarResolver("PLOW_", ";")).
 		Help = `A high-performance HTTP benchmarking tool with real-time web UI and terminal displaying`
@@ -160,7 +226,7 @@ func main() {
 		host:        *host,
 	}
 
-	requester, err := NewRequester(*concurrency, *requests, *duration, &clientOpt)
+	requester, err := NewRequester(*concurrency, *requests, *duration, reqRate.Limit(), &clientOpt)
 	if err != nil {
 		errAndExit(err.Error())
 		return
