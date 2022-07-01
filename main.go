@@ -5,6 +5,8 @@ import (
 	"golang.org/x/time/rate"
 	"io/ioutil"
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"strconv"
 	"strings"
@@ -20,6 +22,7 @@ var (
 	duration    = kingpin.Flag("duration", "Duration of test, examples: -d 10s -d 3m").Short('d').PlaceHolder("DURATION").Duration()
 	interval    = kingpin.Flag("interval", "Print snapshot result every interval, use 0 to print once at the end").Short('i').Default("200ms").Duration()
 	seconds     = kingpin.Flag("seconds", "Use seconds as time unit to print").Bool()
+	jsonFormat  = kingpin.Flag("json", "Print snapshot result as JSON").Bool()
 
 	body        = kingpin.Flag("body", "HTTP request body, if start the body with @, the rest should be a filename to read").Short('b').String()
 	stream      = kingpin.Flag("stream", "Specify whether to stream file specified by '--body @file' using chunked encoding or to read into memory").Default("false").Bool()
@@ -40,7 +43,8 @@ var (
 
 	autoOpenBrowser = kingpin.Flag("auto-open-browser", "Specify whether auto open browser to show Web charts").Bool()
 	clean           = kingpin.Flag("clean", "Clean the histogram bar once its finished. Default is true").Default("true").NegatableBool()
-	summary         = kingpin.Flag("summary", "Only print the summary without realtime reports").Default("false").NegatableBool()
+	summary         = kingpin.Flag("summary", "Only print the summary without realtime reports").Default("false").Bool()
+	pprofAddr       = kingpin.Flag("pprof", "Enable pprof at special address").Hidden().String()
 	url             = kingpin.Arg("url", "request url").Required().String()
 )
 
@@ -79,7 +83,7 @@ var CompactUsageTemplate = `{{define "FormatCommand" -}}
 Examples:
 
   plow http://127.0.0.1:8080/ -c 20 -n 100000
-  plow https://httpbin.org/post -c 20 -d 5m --body @file.json -T 'application/json' -m POST
+  plow https://httpbin.org/post -c 20 -d 5m --body @file.jsonFormat -T 'application/jsonFormat' -m POST
 
 {{if .Context.Flags -}}
 {{T "Flags:"}}
@@ -182,6 +186,10 @@ func main() {
 		return
 	}
 
+	if *pprofAddr != "" {
+		go http.ListenAndServe(*pprofAddr, nil)
+	}
+
 	var err error
 	var bodyBytes []byte
 	var bodyFile string
@@ -232,11 +240,6 @@ func main() {
 		return
 	}
 
-	outStream := os.Stdout
-	if *summary {
-		outStream = os.Stderr
-		isTerminal = false
-	}
 	// description
 	var desc string
 	desc = fmt.Sprintf("Benchmarking %s", *url)
@@ -247,7 +250,7 @@ func main() {
 		desc += fmt.Sprintf(" for %s", duration.String())
 	}
 	desc += fmt.Sprintf(" using %d connection(s).", *concurrency)
-	fmt.Fprintln(outStream, desc)
+	fmt.Fprintln(os.Stderr, desc)
 
 	// charts listener
 	var ln net.Listener
@@ -257,9 +260,9 @@ func main() {
 			errAndExit(err.Error())
 			return
 		}
-		fmt.Fprintf(outStream, "@ Real-time charts is listening on http://%s\n", ln.Addr().String())
+		fmt.Fprintf(os.Stderr, "@ Real-time charts is listening on http://%s\n", ln.Addr().String())
 	}
-	fmt.Fprintln(outStream, "")
+	fmt.Fprintln(os.Stderr, "")
 
 	// do request
 	go requester.Run()
@@ -280,6 +283,5 @@ func main() {
 
 	// terminal printer
 	printer := NewPrinter(*requests, *duration, !*clean, *summary)
-	printer.PrintLoop(report.Snapshot, *interval, *seconds, report.Done())
-
+	printer.PrintLoop(report.Snapshot, *interval, *seconds, *jsonFormat, report.Done())
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/mattn/go-isatty"
 	"github.com/mattn/go-runewidth"
@@ -63,12 +64,12 @@ func (p *Printer) updateProgressValue(rs *SnapshotReport) {
 	}
 }
 
-func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Duration, useSeconds bool, doneChan <-chan struct{}) {
+func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Duration, useSeconds bool, json bool, doneChan <-chan struct{}) {
 	var buf bytes.Buffer
 
 	var backCursor string
 	cl := clearLine
-	if p.summary || interval == 0 {
+	if p.summary || interval == 0 || !isTerminal {
 		cl = nil
 	}
 	echo := func(isFinal bool) {
@@ -76,7 +77,11 @@ func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Durat
 		p.updateProgressValue(report)
 		os.Stdout.WriteString(backCursor)
 		buf.Reset()
-		p.formatTableReports(&buf, report, isFinal, useSeconds)
+		if json {
+			p.formatJSONReports(&buf, report, isFinal, useSeconds)
+		} else {
+			p.formatTableReports(&buf, report, isFinal, useSeconds)
+		}
 		result := buf.Bytes()
 		n := 0
 		for {
@@ -93,7 +98,9 @@ func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Durat
 			result = result[i+1:]
 		}
 		os.Stdout.Sync()
-		backCursor = fmt.Sprintf("\033[%dA", n)
+		if isTerminal {
+			backCursor = fmt.Sprintf("\033[%dA", n)
+		}
 	}
 
 	if interval > 0 {
@@ -185,6 +192,24 @@ func formatFloat64(f float64) string {
 	return strconv.FormatFloat(f, 'f', -1, 64)
 }
 
+func (p *Printer) formatJSONReports(writer *bytes.Buffer, snapshot *SnapshotReport, isFinal bool, useSeconds bool) {
+	indent := 0
+	writer.WriteString("{\n")
+	indent++
+	p.buildJSONSummary(writer, snapshot, indent)
+	if len(snapshot.Errors) != 0 {
+		writer.WriteString(",\n")
+		p.buildJSONErrors(writer, snapshot, indent)
+	}
+	writer.WriteString(",\n")
+	p.buildJSONStats(writer, snapshot, useSeconds, indent)
+	writer.WriteString(",\n")
+	p.buildJSONPercentile(writer, snapshot, useSeconds, indent)
+	writer.WriteString(",\n")
+	p.buildJSONHistogram(writer, snapshot, useSeconds, indent)
+	writer.WriteString("\n}\n")
+}
+
 func (p *Printer) formatTableReports(writer *bytes.Buffer, snapshot *SnapshotReport, isFinal bool, useSeconds bool) {
 	summaryBulk := p.buildSummary(snapshot, isFinal)
 	errorsBulks := p.buildErrors(snapshot)
@@ -211,6 +236,30 @@ func (p *Printer) formatTableReports(writer *bytes.Buffer, snapshot *SnapshotRep
 
 	writer.WriteString("Latency Histogram:\n")
 	writeBulk(writer, hisBulk)
+}
+
+func (p *Printer) buildJSONHistogram(writer *bytes.Buffer, snapshot *SnapshotReport, useSeconds bool, indent int) {
+	tab0 := strings.Repeat("  ", indent)
+	writer.WriteString(tab0 + "\"Histograms\": [\n")
+	tab1 := strings.Repeat("  ", indent+1)
+
+	maxCount := 0
+	hisSum := 0
+	for _, bin := range snapshot.Histograms {
+		if maxCount < bin.Count {
+			maxCount = bin.Count
+		}
+		hisSum += bin.Count
+	}
+	for i, bin := range snapshot.Histograms {
+		writer.WriteString(fmt.Sprintf(`%s[ "%s", %d ]`, tab1,
+			durationToString(bin.Mean, useSeconds), bin.Count))
+		if i != len(snapshot.Histograms)-1 {
+			writer.WriteString(",")
+		}
+		writer.WriteString("\n")
+	}
+	writer.WriteString(tab0 + "]")
 }
 
 func (p *Printer) buildHistogram(snapshot *SnapshotReport, useSeconds bool, isFinal bool) [][]string {
@@ -245,6 +294,22 @@ func (p *Printer) buildHistogram(snapshot *SnapshotReport, useSeconds bool, isFi
 	return hisBulk
 }
 
+func (p *Printer) buildJSONPercentile(writer *bytes.Buffer, snapshot *SnapshotReport, useSeconds bool, indent int) {
+	tab0 := strings.Repeat("  ", indent)
+	writer.WriteString(tab0 + "\"Percentiles\": {\n")
+	tab1 := strings.Repeat("  ", indent+1)
+	for i, percentile := range snapshot.Percentiles {
+		perc := formatFloat64(percentile.Percentile * 100)
+		writer.WriteString(fmt.Sprintf(`%s"%s": "%s"`, tab1, "P"+perc,
+			durationToString(percentile.Latency, useSeconds)))
+		if i != len(snapshot.Percentiles)-1 {
+			writer.WriteString(",")
+		}
+		writer.WriteString("\n")
+	}
+	writer.WriteString(tab0 + "}")
+}
+
 func (p *Printer) buildPercentile(snapshot *SnapshotReport, useSeconds bool) [][]string {
 	percBulk := make([][]string, 2)
 	percAligns := make([]int, 0, len(snapshot.Percentiles))
@@ -257,6 +322,30 @@ func (p *Printer) buildPercentile(snapshot *SnapshotReport, useSeconds bool) [][
 	percAligns[0] = AlignLeft
 	alignBulk(percBulk, percAligns...)
 	return percBulk
+}
+
+func (p *Printer) buildJSONStats(writer *bytes.Buffer, snapshot *SnapshotReport, useSeconds bool, indent int) {
+	tab0 := strings.Repeat("  ", indent)
+	writer.WriteString(tab0 + "\"Statistics\": {\n")
+	tab1 := strings.Repeat("  ", indent+1)
+	writer.WriteString(fmt.Sprintf(`%s"Latency": { "Min": "%s", "Mean": "%s", "StdDev": "%s", "Max": "%s" }`,
+		tab1,
+		durationToString(snapshot.Stats.Min, useSeconds),
+		durationToString(snapshot.Stats.Mean, useSeconds),
+		durationToString(snapshot.Stats.StdDev, useSeconds),
+		durationToString(snapshot.Stats.Max, useSeconds),
+	))
+	if snapshot.RpsStats != nil {
+		writer.WriteString(",\n")
+		writer.WriteString(fmt.Sprintf(`%s"RPS": { "Min": %s, "Mean": %s, "StdDev": %s, "Max": %s }`,
+			tab1,
+			formatFloat64(math.Trunc(snapshot.RpsStats.Min*100)/100.0),
+			formatFloat64(math.Trunc(snapshot.RpsStats.Mean*100)/100.0),
+			formatFloat64(math.Trunc(snapshot.RpsStats.StdDev*100)/100.0),
+			formatFloat64(math.Trunc(snapshot.RpsStats.Max*100)/100.0),
+		))
+	}
+	writer.WriteString("\n" + tab0 + "}")
 }
 
 func (p *Printer) buildStats(snapshot *SnapshotReport, useSeconds bool) [][]string {
@@ -286,6 +375,23 @@ func (p *Printer) buildStats(snapshot *SnapshotReport, useSeconds bool) [][]stri
 	return statsBulk
 }
 
+func (p *Printer) buildJSONErrors(writer *bytes.Buffer, snapshot *SnapshotReport, indent int) {
+	tab0 := strings.Repeat("  ", indent)
+	writer.WriteString(tab0 + "\"Error\": {\n")
+	tab1 := strings.Repeat("  ", indent+1)
+	errors := sortMapStrInt(snapshot.Errors)
+	for i, v := range errors {
+		v[1] = colorize(v[1], FgRedColor)
+		vb, _ := json.Marshal(v[0])
+		writer.WriteString(fmt.Sprintf(`%s%s: %s`, tab1, vb, v[1]))
+		if i != len(errors)-1 {
+			writer.WriteString(",")
+		}
+		writer.WriteString("\n")
+	}
+	writer.WriteString(tab0 + "}")
+}
+
 func (p *Printer) buildErrors(snapshot *SnapshotReport) [][]string {
 	var errorsBulks [][]string
 	for k, v := range snapshot.Errors {
@@ -299,9 +405,47 @@ func (p *Printer) buildErrors(snapshot *SnapshotReport) [][]string {
 	return errorsBulks
 }
 
+func sortMapStrInt(m map[string]int64) (ret [][]string) {
+	for k, v := range m {
+		ret = append(ret, []string{k, strconv.FormatInt(v, 10)})
+	}
+	sort.Slice(ret, func(i, j int) bool { return ret[i][0] < ret[j][0] })
+	return
+}
+
+func (p *Printer) buildJSONSummary(writer *bytes.Buffer, snapshot *SnapshotReport, indent int) {
+	tab0 := strings.Repeat("  ", indent)
+	writer.WriteString(tab0 + "\"Summary\": {\n")
+	{
+		tab1 := strings.Repeat("  ", indent+1)
+		writer.WriteString(fmt.Sprintf("%s\"Elapsed\": \"%s\",\n", tab1, snapshot.Elapsed.Truncate(100*time.Millisecond).String()))
+		writer.WriteString(fmt.Sprintf("%s\"Count\": %d,\n", tab1, snapshot.Count))
+		writer.WriteString(fmt.Sprintf("%s\"Counts\": {\n", tab1))
+		i := 0
+		tab2 := strings.Repeat("  ", indent+2)
+		codes := sortMapStrInt(snapshot.Codes)
+		for _, v := range codes {
+			i++
+			if v[0] != "2xx" {
+				v[1] = colorize(v[1], FgMagentaColor)
+			}
+			writer.WriteString(fmt.Sprintf(`%s"%s": %s`, tab2, v[0], v[1]))
+			if i != len(snapshot.Codes) {
+				writer.WriteString(",")
+			}
+			writer.WriteString("\n")
+		}
+		writer.WriteString(tab1 + "},\n")
+		writer.WriteString(fmt.Sprintf("%s\"RPS\": %.3f,\n", tab1, snapshot.RPS))
+		writer.WriteString(fmt.Sprintf("%s\"Reads\": \"%.3fMB/s\",\n", tab1, snapshot.ReadThroughput))
+		writer.WriteString(fmt.Sprintf("%s\"Writes\": \"%.3fMB/s\"\n", tab1, snapshot.WriteThroughput))
+	}
+	writer.WriteString(tab0 + "}")
+}
+
 func (p *Printer) buildSummary(snapshot *SnapshotReport, isFinal bool) [][]string {
 	summarybulk := make([][]string, 0, 8)
-	elapsedLine := []string{"Elapsed", snapshot.Elapsed.Truncate(time.Millisecond).String()}
+	elapsedLine := []string{"Elapsed", snapshot.Elapsed.Truncate(100 * time.Millisecond).String()}
 	if p.maxDuration > 0 && !isFinal {
 		elapsedLine = append(elapsedLine, p.pbDurStr)
 	}
@@ -315,16 +459,13 @@ func (p *Printer) buildSummary(snapshot *SnapshotReport, isFinal bool) [][]strin
 		countLine,
 	)
 
-	codesBulks := make([][]string, 0, len(snapshot.Codes))
-	for k, v := range snapshot.Codes {
-		vs := strconv.FormatInt(v, 10)
-		if k != "2xx" {
-			vs = colorize(vs, FgMagentaColor)
+	codes := sortMapStrInt(snapshot.Codes)
+	for _, v := range codes {
+		if v[0] != "2xx" {
+			v[1] = colorize(v[1], FgMagentaColor)
 		}
-		codesBulks = append(codesBulks, []string{"  " + k, vs})
+		summarybulk = append(summarybulk, []string{"  " + v[0], v[1]})
 	}
-	sort.Slice(codesBulks, func(i, j int) bool { return codesBulks[i][0] < codesBulks[j][0] })
-	summarybulk = append(summarybulk, codesBulks...)
 	summarybulk = append(summarybulk,
 		[]string{"RPS", fmt.Sprintf("%.3f", snapshot.RPS)},
 		[]string{"Reads", fmt.Sprintf("%.3fMB/s", snapshot.ReadThroughput)},

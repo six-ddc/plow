@@ -99,7 +99,7 @@ A high-performance HTTP benchmarking tool with real-time web UI and terminal dis
 Examples:
 
   plow http://127.0.0.1:8080/ -c 20 -n 100000
-  plow https://httpbin.org/post -c 20 -d 5m --body @file.json -T 'application/json' -m POST
+  plow https://httpbin.org/post -c 20 -d 5m --body @file.jsonFormat -T 'application/jsonFormat' -m POST
 
 Flags:
       --help                   Show context-sensitive help.
@@ -109,6 +109,7 @@ Flags:
   -d, --duration=DURATION      Duration of test, examples: -d 10s -d 3m
   -i, --interval=200ms         Print snapshot result every interval, use 0 to print once at the end
       --seconds                Use seconds as time unit to print
+      --json                   Print snapshot result as JSON
   -b, --body=BODY              HTTP request body, if start the body with @, the rest should be a filename to read
       --stream                 Specify whether to stream file specified by '--body @file' using chunked encoding or to read into memory
   -m, --method="GET"           HTTP method
@@ -126,7 +127,7 @@ Flags:
       --socks5=ip:port         Socks5 proxy
       --auto-open-browser      Specify whether auto open browser to show Web charts
       --[no-]clean             Clean the histogram bar once its finished. Default is true
-      --[no-]summary           Only print the summary without realtime reports
+      --summary                Only print the summary without realtime reports
       --version                Show application version.
 
   Flags default values also read from env PLOW_SOME_FLAG, such as PLOW_TIMEOUT=5s equals to --timeout=5s

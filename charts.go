@@ -42,7 +42,7 @@ function {{ .ViewID }}_sync() {
     $.ajax({
         type: "GET",
         url: "{{ .APIPath }}{{ .Route }}",
-        dataType: "json",
+        dataType: "jsonFormat",
         success: function (result) {
             let opt = goecharts_{{ .ViewID }}.getOption();
             let x = opt.xAxis[0].data;
@@ -141,8 +141,8 @@ func (c *Charts) newRPSView() components.Charter {
 }
 
 type Metrics struct {
-	Values []interface{} `json:"values"`
-	Time   string        `json:"time"`
+	Values []interface{} `jsonFormat:"values"`
+	Time   string        `jsonFormat:"time"`
 }
 
 type Charts struct {
