@@ -14,6 +14,7 @@ import (
 	"time"
 
 	_ "embed"
+
 	cors "github.com/AdhityaRamadhanus/fasthttpcors"
 	"github.com/go-echarts/go-echarts/v2/charts"
 	"github.com/go-echarts/go-echarts/v2/components"
@@ -42,7 +43,7 @@ function {{ .ViewID }}_sync() {
     $.ajax({
         type: "GET",
         url: "{{ .APIPath }}{{ .Route }}",
-        dataType: "jsonFormat",
+        dataType: "json",
         success: function (result) {
             let opt = goecharts_{{ .ViewID }}.getOption();
             let x = opt.xAxis[0].data;
@@ -141,8 +142,8 @@ func (c *Charts) newRPSView() components.Charter {
 }
 
 type Metrics struct {
-	Values []interface{} `jsonFormat:"values"`
-	Time   string        `jsonFormat:"time"`
+	Values []interface{} `json:"values"`
+	Time   string        `json:"time"`
 }
 
 type Charts struct {
