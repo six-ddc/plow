@@ -83,7 +83,7 @@ var CompactUsageTemplate = `{{define "FormatCommand" -}}
 Examples:
 
   plow http://127.0.0.1:8080/ -c 20 -n 100000
-  plow https://httpbin.org/post -c 20 -d 5m --body @file.jsonFormat -T 'application/jsonFormat' -m POST
+  plow https://httpbin.org/post -c 20 -d 5m --body @file.json -T 'application/json' -m POST
 
 {{if .Context.Flags -}}
 {{T "Flags:"}}

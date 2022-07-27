@@ -99,7 +99,7 @@ A high-performance HTTP benchmarking tool with real-time web UI and terminal dis
 Examples:
 
   plow http://127.0.0.1:8080/ -c 20 -n 100000
-  plow https://httpbin.org/post -c 20 -d 5m --body @file.jsonFormat -T 'application/jsonFormat' -m POST
+  plow https://httpbin.org/post -c 20 -d 5m --body @file.json -T 'application/json' -m POST
 
 Flags:
       --help                   Show context-sensitive help.
