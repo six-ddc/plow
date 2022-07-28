@@ -49,6 +49,9 @@ var (
 	url             = kingpin.Arg("url", "request url").Required().String()
 )
 
+// dynamically set by GoReleaser
+var version = "dev"
+
 func errAndExit(msg string) {
 	fmt.Fprintln(os.Stderr, "plow: "+msg)
 	os.Exit(1)
@@ -172,7 +175,7 @@ func rateFlag(c *kingpin.Clause) (target *rateFlagValue) {
 
 func main() {
 	kingpin.UsageTemplate(CompactUsageTemplate).
-		Version("1.3.1").
+		Version(version).
 		Author("six-ddc@github").
 		Resolver(kingpin.PrefixedEnvarResolver("PLOW_", ";")).
 		Help = `A high-performance HTTP benchmarking tool with real-time web UI and terminal displaying`
