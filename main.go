@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"golang.org/x/time/rate"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -11,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/time/rate"
 
 	"gopkg.in/alecthomas/kingpin.v3-unstable"
 )
@@ -171,7 +172,7 @@ func rateFlag(c *kingpin.Clause) (target *rateFlagValue) {
 
 func main() {
 	kingpin.UsageTemplate(CompactUsageTemplate).
-		Version("1.2.0").
+		Version("1.3.1").
 		Author("six-ddc@github").
 		Resolver(kingpin.PrefixedEnvarResolver("PLOW_", ";")).
 		Help = `A high-performance HTTP benchmarking tool with real-time web UI and terminal displaying`
