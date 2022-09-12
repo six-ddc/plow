@@ -8,7 +8,7 @@ require (
 	github.com/go-echarts/go-echarts/v2 v2.2.4
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mattn/go-runewidth v0.0.13
-	github.com/valyala/fasthttp v1.38.0
+	github.com/valyala/fasthttp v1.40.0
 	go.uber.org/automaxprocs v1.5.1
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306
 	gopkg.in/alecthomas/kingpin.v3-unstable v3.0.0-20191105091915-95d230a53780
