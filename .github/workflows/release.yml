@@ -18,7 +18,7 @@ jobs:
         with:
           go-version: 1.18
       - name: Cache Go modules
-        uses: actions/cache@v3.0.5
+        uses: actions/cache@v3.0.11
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
