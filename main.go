@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -25,9 +24,13 @@ var (
 	seconds     = kingpin.Flag("seconds", "Use seconds as time unit to print").Bool()
 	jsonFormat  = kingpin.Flag("json", "Print snapshot result as JSON").Bool()
 
-	body        = kingpin.Flag("body", "HTTP request body, if start the body with @, the rest should be a filename to read").Short('b').String()
-	stream      = kingpin.Flag("stream", "Specify whether to stream file specified by '--body @file' using chunked encoding or to read into memory").Default("false").Bool()
-	method      = kingpin.Flag("method", "HTTP method").Default("GET").Short('m').String()
+	body      = kingpin.Flag("body", "HTTP request body, if start the body with @, the rest should be a filename to read").Short('b').String()
+	stream    = kingpin.Flag("stream", "Specify whether to stream file specified by '--body @file' using chunked encoding or to read into memory").Default("false").Bool()
+	methodSet = false
+	method    = kingpin.Flag("method", "HTTP method").Action(func(_ *kingpin.ParseElement, _ *kingpin.ParseContext) error {
+		methodSet = true
+		return nil
+	}).Default("GET").Short('m').String()
 	headers     = kingpin.Flag("header", "Custom HTTP headers").Short('H').PlaceHolder("K:V").Strings()
 	host        = kingpin.Flag("host", "Host header").String()
 	contentType = kingpin.Flag("content", "Content-Type header").Short('T').String()
@@ -197,23 +200,30 @@ func main() {
 	var err error
 	var bodyBytes []byte
 	var bodyFile string
-	if strings.HasPrefix(*body, "@") {
-		fileName := (*body)[1:]
-		if _, err = os.Stat(fileName); err != nil {
-			errAndExit(err.Error())
-			return
-		}
-		if *stream {
-			bodyFile = fileName
-		} else {
-			bodyBytes, err = ioutil.ReadFile(fileName)
-			if err != nil {
+
+	if *body != "" {
+		if strings.HasPrefix(*body, "@") {
+			fileName := (*body)[1:]
+			if _, err = os.Stat(fileName); err != nil {
 				errAndExit(err.Error())
 				return
 			}
+			if *stream {
+				bodyFile = fileName
+			} else {
+				bodyBytes, err = os.ReadFile(fileName)
+				if err != nil {
+					errAndExit(err.Error())
+					return
+				}
+			}
+		} else {
+			bodyBytes = []byte(*body)
 		}
-	} else if *body != "" {
-		bodyBytes = []byte(*body)
+
+		if !methodSet {
+			*method = "POST"
+		}
 	}
 
 	clientOpt := ClientOpt{
