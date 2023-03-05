@@ -24,7 +24,7 @@ var (
 	seconds     = kingpin.Flag("seconds", "Use seconds as time unit to print").Bool()
 	jsonFormat  = kingpin.Flag("json", "Print snapshot result as JSON").Bool()
 
-	body      = kingpin.Flag("body", "HTTP request body, if start the body with @, the rest should be a filename to read").Short('b').String()
+	body      = kingpin.Flag("body", "HTTP request body, if body starts with '@' the rest will be considered a file's path from which to read the actual body content").Short('b').String()
 	stream    = kingpin.Flag("stream", "Specify whether to stream file specified by '--body @file' using chunked encoding or to read into memory").Default("false").Bool()
 	methodSet = false
 	method    = kingpin.Flag("method", "HTTP method").Action(func(_ *kingpin.ParseElement, _ *kingpin.ParseContext) error {
@@ -45,11 +45,11 @@ var (
 	respReadTimeout  = kingpin.Flag("resp-timeout", "Timeout for full response reading").PlaceHolder("DURATION").Duration()
 	socks5           = kingpin.Flag("socks5", "Socks5 proxy").PlaceHolder("ip:port").String()
 
-	autoOpenBrowser = kingpin.Flag("auto-open-browser", "Specify whether auto open browser to show Web charts").Bool()
+	autoOpenBrowser = kingpin.Flag("auto-open-browser", "Specify whether auto open browser to show web charts").Bool()
 	clean           = kingpin.Flag("clean", "Clean the histogram bar once its finished. Default is true").Default("true").NegatableBool()
 	summary         = kingpin.Flag("summary", "Only print the summary without realtime reports").Default("false").Bool()
 	pprofAddr       = kingpin.Flag("pprof", "Enable pprof at special address").Hidden().String()
-	url             = kingpin.Arg("url", "request url").Required().String()
+	url             = kingpin.Arg("url", "Request url").Required().String()
 )
 
 // dynamically set by GoReleaser
