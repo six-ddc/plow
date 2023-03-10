@@ -7,7 +7,7 @@ require (
 	github.com/beorn7/perks v1.0.1
 	github.com/go-echarts/go-echarts/v2 v2.2.4
 	github.com/mattn/go-isatty v0.0.14
-	github.com/mattn/go-runewidth v0.0.13
+	github.com/mattn/go-runewidth v0.0.14
 	github.com/valyala/fasthttp v1.44.0
 	go.uber.org/automaxprocs v1.5.1
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306
