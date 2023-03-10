@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/AdhityaRamadhanus/fasthttpcors v0.0.0-20170121111917-d4c07198763a
 	github.com/beorn7/perks v1.0.1
-	github.com/go-echarts/go-echarts/v2 v2.2.4
+	github.com/go-echarts/go-echarts/v2 v2.2.5
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mattn/go-runewidth v0.0.13
 	github.com/valyala/fasthttp v1.44.0
