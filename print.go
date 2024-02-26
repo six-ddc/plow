@@ -123,7 +123,7 @@ func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Durat
 	echo(true)
 }
 
-//nolint
+// nolint
 const (
 	FgBlackColor int = iota + 30
 	FgRedColor
