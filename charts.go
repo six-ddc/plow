@@ -32,8 +32,15 @@ var (
 	apiPath         = "/data/"
 	latencyView     = "latency"
 	rpsView         = "rps"
+	codeView        = "code"
 	timeFormat      = "15:04:05"
 	refreshInterval = time.Second
+
+	templateRegistry = map[string]string{
+		rpsView:     ViewTpl,
+		latencyView: ViewTpl,
+		codeView:    CodeViewTpl,
+	}
 )
 
 const (
@@ -71,10 +78,65 @@ function {{ .ViewID }}_sync() {
 </html>
 {{ end }}
 `
+	CodeViewTpl = `
+$(function () { setInterval({{ .ViewID }}_sync, {{ .Interval }}); });
+function {{ .ViewID }}_sync() {
+    $.ajax({
+        type: "GET",
+        url: "{{ .APIPath }}{{ .Route }}",
+        dataType: "json",
+        success: function (result) {
+            let opt = goecharts_{{ .ViewID }}.getOption();
+            let x = opt.xAxis[0].data;
+            x.push(result.time);
+            opt.xAxis[0].data = x;
+							
+			let nameAndSeriesMapping = {};
+			for (let i = 0; i < opt.series.length; i++) {
+				nameAndSeriesMapping[opt.series[i].name] = opt.series[i];
+			}
+			
+			let code200Count = nameAndSeriesMapping['200'].data.length;
+			
+			let codes = result.values[0];
+			if (codes === null){ 
+				for (let key in nameAndSeriesMapping) {
+					let series = nameAndSeriesMapping[key];
+  					series.data.push({value:null});
+				}
+			}else{
+				if (!('200' in codes)) {
+					codes['200'] = null;
+				}
+			
+				for (let code in codes) {
+					let count = codes[code];
+					if (code in nameAndSeriesMapping){
+						let series = nameAndSeriesMapping[code];
+						series.data.push({value:count});
+					}else{
+						let data = [];
+						for (let i = 0; i < code200Count; i++) {
+							data.push[null];
+						}
+						var newSeries = {
+							name:  code,
+							type: 'line',
+							data:  data
+						};
+						opt.series.push(newSeries);
+					}
+				}
+			}
+			
+			goecharts_{{ .ViewID }}.setOption(opt);
+        }
+    });
+}`
 )
 
 func (c *Charts) genViewTemplate(vid, route string) string {
-	tpl, err := template.New("view").Parse(ViewTpl)
+	tpl, err := template.New("view").Parse(templateRegistry[route])
 	if err != nil {
 		panic("failed to parse template " + err.Error())
 	}
@@ -141,6 +203,17 @@ func (c *Charts) newRPSView() components.Charter {
 	return graph
 }
 
+func (c *Charts) newCodeView() components.Charter {
+	graph := c.newBasicView(codeView)
+	graph.SetGlobalOptions(
+		charts.WithTitleOpts(opts.Title{Title: "Response Status"}),
+		charts.WithYAxisOpts(opts.YAxis{Scale: true}),
+		charts.WithLegendOpts(opts.Legend{Show: true}),
+	)
+	graph.AddSeries("200", []opts.LineData{})
+	return graph
+}
+
 type Metrics struct {
 	Values []interface{} `json:"values"`
 	Time   string        `json:"time"`
@@ -160,7 +233,7 @@ func NewCharts(ln net.Listener, dataFunc func() *ChartsReport, desc string) (*Ch
 	c.page.PageTitle = "plow"
 	c.page.AssetsHost = assetsPath
 	c.page.Assets.JSAssets.Add("jquery.min.js")
-	c.page.AddCharts(c.newLatencyView(), c.newRPSView())
+	c.page.AddCharts(c.newLatencyView(), c.newRPSView(), c.newCodeView())
 
 	return c, nil
 }
@@ -183,6 +256,12 @@ func (c *Charts) Handler(ctx *fasthttp.RequestCtx) {
 		case rpsView:
 			if reportData != nil {
 				values = append(values, reportData.RPS)
+			} else {
+				values = append(values, nil)
+			}
+		case codeView:
+			if reportData != nil {
+				values = append(values, reportData.CodeMap)
 			} else {
 				values = append(values, nil)
 			}

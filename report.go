@@ -20,6 +20,14 @@ var quantilesTarget = map[float64]float64{
 	0.9999: 0.00001,
 }
 
+var httpStatusSectionLabelMap = map[int]string{
+	1: "1xx",
+	2: "2xx",
+	3: "3xx",
+	4: "4xx",
+	5: "5xx",
+}
+
 type Stats struct {
 	count int64
 	sum   float64
@@ -71,7 +79,7 @@ type StreamReport struct {
 	rpsStats         *Stats
 	latencyQuantile  *quantile.Stream
 	latencyHistogram *histogram.Histogram
-	codes            map[string]int64
+	codes            map[int]int64
 	errors           map[string]int64
 
 	latencyWithinSec *Stats
@@ -88,7 +96,7 @@ func NewStreamReport() *StreamReport {
 	return &StreamReport{
 		latencyQuantile:  quantile.NewTargeted(quantilesTarget),
 		latencyHistogram: histogram.New(8),
-		codes:            make(map[string]int64, 1),
+		codes:            make(map[int]int64, 1),
 		errors:           make(map[string]int64, 1),
 		doneChan:         make(chan struct{}, 1),
 		latencyStats:     &Stats{},
@@ -144,11 +152,11 @@ func (s *StreamReport) Collect(records <-chan *ReportRecord) {
 		s.lock.Lock()
 		latencyWithinSecTemp.Update(float64(r.cost))
 		s.insert(float64(r.cost))
-		if r.code != "" {
-			s.codes[r.code] ++
+		if r.code != 0 {
+			s.codes[r.code]++
 		}
 		if r.error != "" {
-			s.errors[r.error] ++
+			s.errors[r.error]++
 		}
 		s.readBytes = r.readBytes
 		s.writeBytes = r.writeBytes
@@ -222,7 +230,8 @@ func (s *StreamReport) Snapshot() *SnapshotReport {
 
 	rs.Codes = make(map[string]int64, len(s.codes))
 	for k, v := range s.codes {
-		rs.Codes[k] = v
+		section := k / 100
+		rs.Codes[httpStatusSectionLabelMap[section]] = v
 	}
 	rs.Errors = make(map[string]int64, len(s.errors))
 	for k, v := range s.errors {
@@ -263,6 +272,7 @@ func (s *StreamReport) Done() <-chan struct{} {
 type ChartsReport struct {
 	RPS     float64
 	Latency Stats
+	CodeMap map[int]int64
 }
 
 func (s *StreamReport) Charts() *ChartsReport {
@@ -274,6 +284,7 @@ func (s *StreamReport) Charts() *ChartsReport {
 		cr = &ChartsReport{
 			RPS:     s.rpsWithinSec,
 			Latency: *s.latencyWithinSec,
+			CodeMap: s.codes,
 		}
 	}
 	s.lock.Unlock()

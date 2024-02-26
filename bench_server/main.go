@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"math/rand"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -19,9 +20,10 @@ func main() {
 	log.Println("Starting HTTP server on:", addr)
 	log.Fatalln(fasthttp.ListenAndServe(addr, func(c *fasthttp.RequestCtx) {
 		//time.Sleep(time.Duration(rand.Int63n(int64(5 * time.Second))))
-		if rand.Intn(5) == 0 {
-			c.SetStatusCode(400)
+		statusCodes := []int{
+			http.StatusOK, http.StatusOK, http.StatusBadRequest, http.StatusTooManyRequests, http.StatusBadGateway,
 		}
+		c.SetStatusCode(statusCodes[rand.Intn(len(statusCodes))])
 		_, werr := c.Write(c.Request.Body())
 		if werr != nil {
 			log.Println(werr)

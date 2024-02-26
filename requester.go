@@ -28,7 +28,7 @@ var (
 
 type ReportRecord struct {
 	cost       time.Duration
-	code       string
+	code       int
 	error      string
 	readBytes  int64
 	writeBytes int64
@@ -253,36 +253,21 @@ func (r *Requester) DoRequest(req *fasthttp.Request, resp *fasthttp.Response, rr
 	} else {
 		err = r.httpClient.Do(req, resp)
 	}
-	var code string
 
 	if err != nil {
 		rr.cost = time.Since(startTime) - t1
-		rr.code = ""
 		rr.error = err.Error()
 		return
-	}
-	switch resp.StatusCode() / 100 {
-	case 1:
-		code = "1xx"
-	case 2:
-		code = "2xx"
-	case 3:
-		code = "3xx"
-	case 4:
-		code = "4xx"
-	case 5:
-		code = "5xx"
 	}
 	err = resp.BodyWriteTo(ioutil.Discard)
 	if err != nil {
 		rr.cost = time.Since(startTime) - t1
-		rr.code = ""
 		rr.error = err.Error()
 		return
 	}
 
 	rr.cost = time.Since(startTime) - t1
-	rr.code = code
+	rr.code = resp.StatusCode()
 	rr.error = ""
 }
 
