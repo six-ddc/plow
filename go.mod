@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/AdhityaRamadhanus/fasthttpcors v0.0.0-20170121111917-d4c07198763a
 	github.com/beorn7/perks v1.0.1
-	github.com/go-echarts/go-echarts/v2 v2.2.4
+	github.com/go-echarts/go-echarts/v2 v2.3.3
 	github.com/mattn/go-isatty v0.0.19
 	github.com/mattn/go-runewidth v0.0.13
 	github.com/valyala/fasthttp v1.44.0
@@ -19,6 +19,7 @@ require (
 	github.com/alecthomas/units v0.0.0-20210208195552-ff826a37aa15 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/nicksnyder/go-i18n v1.10.1 // indirect
 	github.com/pelletier/go-toml v1.2.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
