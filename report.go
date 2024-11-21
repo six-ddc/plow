@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/beorn7/perks/histogram"
-	"github.com/beorn7/perks/quantile"
 	"math"
 	"sync"
 	"time"
+
+	"github.com/beorn7/perks/histogram"
+	"github.com/beorn7/perks/quantile"
 )
 
 var quantiles = []float64{0.50, 0.75, 0.90, 0.95, 0.99, 0.999, 0.9999}
