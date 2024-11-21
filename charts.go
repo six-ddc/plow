@@ -164,7 +164,7 @@ func (c *Charts) genViewTemplate(vid, route string) string {
 func (c *Charts) newBasicView(route string) *charts.Line {
 	graph := charts.NewLine()
 	graph.SetGlobalOptions(
-		charts.WithTooltipOpts(opts.Tooltip{Show: true, Trigger: "axis"}),
+		charts.WithTooltipOpts(opts.Tooltip{Show: opts.Bool(true), Trigger: "axis"}),
 		charts.WithXAxisOpts(opts.XAxis{Name: "Time"}),
 		charts.WithInitializationOpts(opts.Initialization{
 			Width:  "700px",
@@ -175,7 +175,7 @@ func (c *Charts) newBasicView(route string) *charts.Line {
 			XAxisIndex: []int{0},
 		}),
 	)
-	graph.SetXAxis([]string{}).SetSeriesOptions(charts.WithLineChartOpts(opts.LineChart{Smooth: true}))
+	graph.SetXAxis([]string{}).SetSeriesOptions(charts.WithLineChartOpts(opts.LineChart{Smooth: opts.Bool(true)}))
 	graph.AddJSFuncs(c.genViewTemplate(graph.ChartID, route))
 	return graph
 }
@@ -184,8 +184,8 @@ func (c *Charts) newLatencyView() components.Charter {
 	graph := c.newBasicView(latencyView)
 	graph.SetGlobalOptions(
 		charts.WithTitleOpts(opts.Title{Title: "Latency"}),
-		charts.WithYAxisOpts(opts.YAxis{Scale: true, AxisLabel: &opts.AxisLabel{Formatter: "{value} ms"}}),
-		charts.WithLegendOpts(opts.Legend{Show: true, Selected: map[string]bool{"Min": false, "Max": false}}),
+		charts.WithYAxisOpts(opts.YAxis{Scale: opts.Bool(true), AxisLabel: &opts.AxisLabel{Formatter: "{value} ms"}}),
+		charts.WithLegendOpts(opts.Legend{Show: opts.Bool(true), Selected: map[string]bool{"Min": false, "Max": false}}),
 	)
 	graph.AddSeries("Min", []opts.LineData{}).
 		AddSeries("Mean", []opts.LineData{}).
@@ -197,7 +197,7 @@ func (c *Charts) newRPSView() components.Charter {
 	graph := c.newBasicView(rpsView)
 	graph.SetGlobalOptions(
 		charts.WithTitleOpts(opts.Title{Title: "Reqs/sec"}),
-		charts.WithYAxisOpts(opts.YAxis{Scale: true}),
+		charts.WithYAxisOpts(opts.YAxis{Scale: opts.Bool(true)}),
 	)
 	graph.AddSeries("RPS", []opts.LineData{})
 	return graph
@@ -207,8 +207,8 @@ func (c *Charts) newCodeView() components.Charter {
 	graph := c.newBasicView(codeView)
 	graph.SetGlobalOptions(
 		charts.WithTitleOpts(opts.Title{Title: "Response Status"}),
-		charts.WithYAxisOpts(opts.YAxis{Scale: true}),
-		charts.WithLegendOpts(opts.Legend{Show: true}),
+		charts.WithYAxisOpts(opts.YAxis{Scale: opts.Bool(true)}),
+		charts.WithLegendOpts(opts.Legend{Show: opts.Bool(true)}),
 	)
 	graph.AddSeries("200", []opts.LineData{})
 	return graph
