@@ -98,6 +98,7 @@ type Requester struct {
 	clientOpt   *ClientOpt
 	httpClient  *fasthttp.HostClient
 	httpHeader  *fasthttp.RequestHeader
+	errWriter   io.Writer
 
 	recordChan chan *ReportRecord
 	closeOnce  sync.Once
@@ -131,7 +132,7 @@ type ClientOpt struct {
 	host        string
 }
 
-func NewRequester(concurrency int, requests int64, duration time.Duration, reqRate *rate.Limit, clientOpt *ClientOpt) (*Requester, error) {
+func NewRequester(concurrency int, requests int64, duration time.Duration, reqRate *rate.Limit, errWriter io.Writer, clientOpt *ClientOpt) (*Requester, error) {
 	maxResult := concurrency * 100
 	if maxResult > 8192 {
 		maxResult = 8192
@@ -141,6 +142,7 @@ func NewRequester(concurrency int, requests int64, duration time.Duration, reqRa
 		reqRate:     reqRate,
 		requests:    requests,
 		duration:    duration,
+		errWriter:   errWriter,
 		clientOpt:   clientOpt,
 		recordChan:  make(chan *ReportRecord, maxResult),
 	}
@@ -260,7 +262,13 @@ func (r *Requester) DoRequest(req *fasthttp.Request, resp *fasthttp.Response, rr
 		rr.error = err.Error()
 		return
 	}
-	err = resp.BodyWriteTo(io.Discard)
+
+	writeTo := io.Discard
+	if resp.StatusCode() >= 500 {
+		writeTo = r.errWriter
+		_, _ = r.errWriter.Write([]byte(fmt.Sprintf("\n%d %s\n", resp.StatusCode(), rr.cost)))
+	}
+	err = resp.BodyWriteTo(writeTo)
 	if err != nil {
 		rr.cost = time.Since(startTime) - t1
 		rr.error = err.Error()

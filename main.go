@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -47,6 +48,7 @@ var (
 
 	autoOpenBrowser = kingpin.Flag("auto-open-browser", "Specify whether auto open browser to show web charts").Bool()
 	clean           = kingpin.Flag("clean", "Clean the histogram bar once its finished. Default is true").Default("true").NegatableBool()
+	outputErrors    = kingpin.Flag("output-errors", "Output errors to file").String()
 	summary         = kingpin.Flag("summary", "Only print the summary without realtime reports").Default("false").Bool()
 	pprofAddr       = kingpin.Flag("pprof", "Enable pprof at special address").Hidden().String()
 	url             = kingpin.Arg("url", "Request url").Required().String()
@@ -226,6 +228,15 @@ func main() {
 		}
 	}
 
+	errWriter := io.Discard
+	if *outputErrors != "" {
+		errWriter, err = os.Create(*outputErrors)
+		if err != nil {
+			errAndExit(err.Error())
+			return
+		}
+	}
+
 	clientOpt := ClientOpt{
 		url:       *url,
 		method:    *method,
@@ -248,7 +259,7 @@ func main() {
 		host:        *host,
 	}
 
-	requester, err := NewRequester(*concurrency, *requests, *duration, reqRate.Limit(), &clientOpt)
+	requester, err := NewRequester(*concurrency, *requests, *duration, reqRate.Limit(), errWriter, &clientOpt)
 	if err != nil {
 		errAndExit(err.Error())
 		return
