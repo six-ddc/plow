@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/valyala/fasthttp"
 )
@@ -15,7 +14,6 @@ var serverPort = flag.Int("p", 8080, "port to use for benchmarks")
 
 func main() {
 	flag.Parse()
-	rand.Seed(time.Now().UnixNano())
 	addr := "localhost:" + strconv.Itoa(*serverPort)
 	log.Println("Starting HTTP server on:", addr)
 	log.Fatalln(fasthttp.ListenAndServe(addr, func(c *fasthttp.RequestCtx) {

@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/mattn/go-isatty"
-	"github.com/mattn/go-runewidth"
 	"math"
 	"os"
 	"regexp"
@@ -13,6 +11,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mattn/go-isatty"
+	"github.com/mattn/go-runewidth"
 )
 
 var (
@@ -192,7 +193,7 @@ func formatFloat64(f float64) string {
 	return strconv.FormatFloat(f, 'f', -1, 64)
 }
 
-func (p *Printer) formatJSONReports(writer *bytes.Buffer, snapshot *SnapshotReport, isFinal bool, useSeconds bool) {
+func (p *Printer) formatJSONReports(writer *bytes.Buffer, snapshot *SnapshotReport, _ bool, useSeconds bool) {
 	indent := 0
 	writer.WriteString("{\n")
 	indent++
