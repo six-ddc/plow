@@ -4,11 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/valyala/fasthttp"
-	"github.com/valyala/fasthttp/fasthttpproxy"
-	"go.uber.org/automaxprocs/maxprocs"
-	"golang.org/x/time/rate"
-	"io/ioutil"
+	"io"
 	"net"
 	url2 "net/url"
 	"os"
@@ -19,6 +15,11 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttpproxy"
+	"go.uber.org/automaxprocs/maxprocs"
+	"golang.org/x/time/rate"
 )
 
 var (
@@ -259,7 +260,7 @@ func (r *Requester) DoRequest(req *fasthttp.Request, resp *fasthttp.Response, rr
 		rr.error = err.Error()
 		return
 	}
-	err = resp.BodyWriteTo(ioutil.Discard)
+	err = resp.BodyWriteTo(io.Discard)
 	if err != nil {
 		rr.cost = time.Since(startTime) - t1
 		rr.error = err.Error()
