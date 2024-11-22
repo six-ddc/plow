@@ -267,6 +267,7 @@ func (r *Requester) DoRequest(req *fasthttp.Request, resp *fasthttp.Response, rr
 	if resp.StatusCode() >= 500 {
 		writeTo = r.errWriter
 		_, _ = r.errWriter.Write([]byte(fmt.Sprintf("\n%d %s\n", resp.StatusCode(), rr.cost)))
+		_, _ = r.errWriter.Write([]byte(fmt.Sprintf("%s", &resp.Header)))
 	}
 	err = resp.BodyWriteTo(writeTo)
 	if err != nil {
