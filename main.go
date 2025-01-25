@@ -237,6 +237,10 @@ func main() {
 		}
 	}
 
+	if !strings.Contains(strings.ToLower(*url), "://") {
+		*url = "https://" + *url
+	}
+
 	clientOpt := ClientOpt{
 		url:       *url,
 		method:    *method,
