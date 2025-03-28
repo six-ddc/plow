@@ -83,6 +83,7 @@ type StreamReport struct {
 	latencyHistogram *histogram.Histogram
 	codes            map[int]int64
 	errors           map[string]int64
+	concurrencyCount int
 
 	latencyWithinSec *Stats
 	rpsWithinSec     float64
@@ -110,7 +111,6 @@ func NewStreamReport() *StreamReport {
 func (s *StreamReport) insert(v float64) {
 	s.latencyQuantile.Insert(v)
 	s.latencyHistogram.Insert(v)
-
 	s.latencyStats.Update(v)
 }
 
@@ -163,6 +163,7 @@ func (s *StreamReport) Collect(records <-chan *ReportRecord) {
 		}
 		s.readBytes = r.readBytes
 		s.writeBytes = r.writeBytes
+		s.concurrencyCount = r.concurrencyCount
 		s.lock.Unlock()
 		recordPool.Put(r)
 	}
@@ -176,13 +177,14 @@ func (s *StreamReport) copyCodes() map[int]int64 {
 }
 
 type SnapshotReport struct {
-	Elapsed         time.Duration
-	Count           int64
-	Codes           map[string]int64
-	Errors          map[string]int64
-	RPS             float64
-	ReadThroughput  float64
-	WriteThroughput float64
+	Elapsed          time.Duration
+	Count            int64
+	Codes            map[string]int64
+	Errors           map[string]int64
+	RPS              float64
+	ReadThroughput   float64
+	WriteThroughput  float64
+	concurrencyCount int
 
 	Stats *struct {
 		Min    time.Duration
@@ -237,6 +239,7 @@ func (s *StreamReport) Snapshot() *SnapshotReport {
 	rs.RPS = float64(rs.Count) / elapseInSec
 	rs.ReadThroughput = float64(s.readBytes) / 1024.0 / 1024.0 / elapseInSec
 	rs.WriteThroughput = float64(s.writeBytes) / 1024.0 / 1024.0 / elapseInSec
+	rs.concurrencyCount = s.concurrencyCount
 
 	rs.Codes = make(map[string]int64, len(s.codes))
 	for k, v := range s.codes {
@@ -280,9 +283,10 @@ func (s *StreamReport) Done() <-chan struct{} {
 }
 
 type ChartsReport struct {
-	RPS     float64
-	Latency Stats
-	CodeMap map[int]int64
+	RPS         float64
+	Latency     Stats
+	CodeMap     map[int]int64
+	Concurrency int
 }
 
 func (s *StreamReport) Charts() *ChartsReport {
@@ -292,9 +296,10 @@ func (s *StreamReport) Charts() *ChartsReport {
 		cr = nil
 	} else {
 		cr = &ChartsReport{
-			RPS:     s.rpsWithinSec,
-			Latency: *s.latencyWithinSec,
-			CodeMap: s.copyCodes(),
+			RPS:         s.rpsWithinSec,
+			Latency:     *s.latencyWithinSec,
+			CodeMap:     s.copyCodes(),
+			Concurrency: s.concurrencyCount,
 		}
 	}
 	s.lock.Unlock()

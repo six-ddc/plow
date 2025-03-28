@@ -438,6 +438,7 @@ func (p *Printer) buildJSONSummary(writer *bytes.Buffer, snapshot *SnapshotRepor
 		}
 		writer.WriteString(tab1 + "},\n")
 		writer.WriteString(fmt.Sprintf("%s\"RPS\": %.3f,\n", tab1, snapshot.RPS))
+		writer.WriteString(fmt.Sprintf("%s\"Concurrency\": %d,\n", tab1, snapshot.concurrencyCount))
 		writer.WriteString(fmt.Sprintf("%s\"Reads\": \"%.3fMB/s\",\n", tab1, snapshot.ReadThroughput))
 		writer.WriteString(fmt.Sprintf("%s\"Writes\": \"%.3fMB/s\"\n", tab1, snapshot.WriteThroughput))
 	}
@@ -469,6 +470,7 @@ func (p *Printer) buildSummary(snapshot *SnapshotReport, isFinal bool) [][]strin
 	}
 	summarybulk = append(summarybulk,
 		[]string{"RPS", fmt.Sprintf("%.3f", snapshot.RPS)},
+		[]string{"Concurrency", fmt.Sprintf("%d", snapshot.concurrencyCount)},
 		[]string{"Reads", fmt.Sprintf("%.3fMB/s", snapshot.ReadThroughput)},
 		[]string{"Writes", fmt.Sprintf("%.3fMB/s", snapshot.WriteThroughput)},
 	)

@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	url2 "net/url"
 	"os"
@@ -28,11 +29,12 @@ var (
 )
 
 type ReportRecord struct {
-	cost       time.Duration
-	code       int
-	error      string
-	readBytes  int64
-	writeBytes int64
+	cost             time.Duration
+	code             int
+	error            string
+	readBytes        int64
+	writeBytes       int64
+	concurrencyCount int
 }
 
 var recordPool = sync.Pool{
@@ -95,6 +97,7 @@ type Requester struct {
 	reqRate     *rate.Limit
 	requests    int64
 	duration    time.Duration
+	rampUp      int
 	clientOpt   *ClientOpt
 	httpClient  *fasthttp.HostClient
 	httpHeader  *fasthttp.RequestHeader
@@ -132,7 +135,7 @@ type ClientOpt struct {
 	host        string
 }
 
-func NewRequester(concurrency int, requests int64, duration time.Duration, reqRate *rate.Limit, errWriter io.Writer, clientOpt *ClientOpt) (*Requester, error) {
+func NewRequester(concurrency int, requests int64, duration time.Duration, reqRate *rate.Limit, errWriter io.Writer, clientOpt *ClientOpt, rampUp int) (*Requester, error) {
 	maxResult := concurrency * 100
 	if maxResult > 8192 {
 		maxResult = 8192
@@ -142,6 +145,7 @@ func NewRequester(concurrency int, requests int64, duration time.Duration, reqRa
 		reqRate:     reqRate,
 		requests:    requests,
 		duration:    duration,
+		rampUp:      rampUp,
 		errWriter:   errWriter,
 		clientOpt:   clientOpt,
 		recordChan:  make(chan *ReportRecord, maxResult),
@@ -309,66 +313,82 @@ func (r *Requester) Run() {
 	}
 
 	semaphore := r.requests
-	for i := 0; i < r.concurrency; i++ {
-		r.wg.Add(1)
-		go func() {
-			defer func() {
-				r.wg.Done()
-				v := recover()
-				if v != nil && v != sendOnCloseError {
-					panic(v)
+	if r.rampUp <= 0 {
+		r.rampUp = r.concurrency
+	}
+	concurrencyCount := 0
+	loopCount := int(math.Ceil(float64(r.concurrency) / float64(r.rampUp)))
+	for i := 0; i < loopCount; i++ {
+		for j := 0; j < r.rampUp; j++ {
+			if concurrencyCount > r.concurrency {
+				break
+			}
+			concurrencyCount++
+			r.wg.Add(1)
+			go func() {
+				defer func() {
+					r.wg.Done()
+					v := recover()
+					if v != nil && v != sendOnCloseError {
+						panic(v)
+					}
+				}()
+				req := &fasthttp.Request{}
+				resp := &fasthttp.Response{}
+				r.httpHeader.CopyTo(&req.Header)
+				if r.httpClient.IsTLS {
+					req.URI().SetScheme("https")
+					req.URI().SetHostBytes(req.Header.Host())
+				}
+
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					default:
+					}
+
+					if limiter != nil {
+						err := limiter.Wait(ctx)
+						if err != nil {
+							continue
+						}
+					}
+
+					if r.requests > 0 && atomic.AddInt64(&semaphore, -1) < 0 {
+						cancelFunc()
+						return
+					}
+
+					if r.clientOpt.bodyFile != "" {
+						file, err := os.Open(r.clientOpt.bodyFile)
+						if err != nil {
+							rr := recordPool.Get().(*ReportRecord)
+							rr.cost = 0
+							rr.error = err.Error()
+							rr.readBytes = atomic.LoadInt64(&r.readBytes)
+							rr.writeBytes = atomic.LoadInt64(&r.writeBytes)
+							rr.concurrencyCount = concurrencyCount
+							r.recordChan <- rr
+							continue
+						}
+						req.SetBodyStream(file, -1)
+					} else {
+						req.SetBodyRaw(r.clientOpt.bodyBytes)
+					}
+					resp.Reset()
+					rr := recordPool.Get().(*ReportRecord)
+					r.DoRequest(req, resp, rr)
+					rr.readBytes = atomic.LoadInt64(&r.readBytes)
+					rr.writeBytes = atomic.LoadInt64(&r.writeBytes)
+					rr.concurrencyCount = concurrencyCount
+					r.recordChan <- rr
 				}
 			}()
-			req := &fasthttp.Request{}
-			resp := &fasthttp.Response{}
-			r.httpHeader.CopyTo(&req.Header)
-			if r.httpClient.IsTLS {
-				req.URI().SetScheme("https")
-				req.URI().SetHostBytes(req.Header.Host())
-			}
-
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-
-				if limiter != nil {
-					err := limiter.Wait(ctx)
-					if err != nil {
-						continue
-					}
-				}
-
-				if r.requests > 0 && atomic.AddInt64(&semaphore, -1) < 0 {
-					cancelFunc()
-					return
-				}
-
-				if r.clientOpt.bodyFile != "" {
-					file, err := os.Open(r.clientOpt.bodyFile)
-					if err != nil {
-						rr := recordPool.Get().(*ReportRecord)
-						rr.cost = 0
-						rr.error = err.Error()
-						rr.readBytes = atomic.LoadInt64(&r.readBytes)
-						rr.writeBytes = atomic.LoadInt64(&r.writeBytes)
-						r.recordChan <- rr
-						continue
-					}
-					req.SetBodyStream(file, -1)
-				} else {
-					req.SetBodyRaw(r.clientOpt.bodyBytes)
-				}
-				resp.Reset()
-				rr := recordPool.Get().(*ReportRecord)
-				r.DoRequest(req, resp, rr)
-				rr.readBytes = atomic.LoadInt64(&r.readBytes)
-				rr.writeBytes = atomic.LoadInt64(&r.writeBytes)
-				r.recordChan <- rr
-			}
-		}()
+		}
+		if r.rampUp != r.concurrency {
+			time.Sleep(time.Second)
+		}
 	}
 
 	r.wg.Wait()
