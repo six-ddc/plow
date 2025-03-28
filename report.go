@@ -3,6 +3,7 @@ package main
 import (
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/beorn7/perks/histogram"
@@ -116,6 +117,7 @@ func (s *StreamReport) insert(v float64) {
 func (s *StreamReport) Collect(records <-chan *ReportRecord) {
 	latencyWithinSecTemp := &Stats{}
 	go func() {
+		startTime := time.Unix(0, atomic.LoadInt64(&startTimeUnixNano))
 		ticker := time.NewTicker(time.Second)
 		lastCount := int64(0)
 		lastTime := startTime
@@ -165,6 +167,13 @@ func (s *StreamReport) Collect(records <-chan *ReportRecord) {
 		recordPool.Put(r)
 	}
 }
+func (s *StreamReport) copyCodes() map[int]int64 {
+	res := make(map[int]int64, len(s.codes))
+	for k, v := range s.codes {
+		res[k] = v
+	}
+	return res
+}
 
 type SnapshotReport struct {
 	Elapsed         time.Duration
@@ -202,7 +211,7 @@ type SnapshotReport struct {
 
 func (s *StreamReport) Snapshot() *SnapshotReport {
 	s.lock.Lock()
-
+	startTime := time.Unix(0, atomic.LoadInt64(&startTimeUnixNano))
 	rs := &SnapshotReport{
 		Elapsed: time.Since(startTime),
 		Count:   s.latencyStats.count,
@@ -285,7 +294,7 @@ func (s *StreamReport) Charts() *ChartsReport {
 		cr = &ChartsReport{
 			RPS:     s.rpsWithinSec,
 			Latency: *s.latencyWithinSec,
-			CodeMap: s.codes,
+			CodeMap: s.copyCodes(),
 		}
 	}
 	s.lock.Unlock()
