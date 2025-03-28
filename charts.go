@@ -33,13 +33,15 @@ var (
 	latencyView     = "latency"
 	rpsView         = "rps"
 	codeView        = "code"
+	concurrencyView = "concurrency"
 	timeFormat      = "15:04:05"
 	refreshInterval = time.Second
 
 	templateRegistry = map[string]string{
-		rpsView:     ViewTpl,
-		latencyView: ViewTpl,
-		codeView:    CodeViewTpl,
+		rpsView:         ViewTpl,
+		latencyView:     ViewTpl,
+		codeView:        CodeViewTpl,
+		concurrencyView: ViewTpl,
 	}
 )
 
@@ -214,6 +216,16 @@ func (c *Charts) newCodeView() components.Charter {
 	return graph
 }
 
+func (c *Charts) newConcurrencyView() components.Charter {
+	graph := c.newBasicView(concurrencyView)
+	graph.SetGlobalOptions(
+		charts.WithTitleOpts(opts.Title{Title: "Concurrency"}),
+		charts.WithYAxisOpts(opts.YAxis{Scale: opts.Bool(true)}),
+	)
+	graph.AddSeries("Concurrency", []opts.LineData{})
+	return graph
+}
+
 type Metrics struct {
 	Values []interface{} `json:"values"`
 	Time   string        `json:"time"`
@@ -233,7 +245,7 @@ func NewCharts(ln net.Listener, dataFunc func() *ChartsReport, desc string) (*Ch
 	c.page.PageTitle = "plow"
 	c.page.AssetsHost = assetsPath
 	c.page.Assets.JSAssets.Add("jquery.min.js")
-	c.page.AddCharts(c.newLatencyView(), c.newRPSView(), c.newCodeView())
+	c.page.AddCharts(c.newLatencyView(), c.newRPSView(), c.newCodeView(), c.newConcurrencyView())
 
 	return c, nil
 }
@@ -262,6 +274,12 @@ func (c *Charts) Handler(ctx *fasthttp.RequestCtx) {
 		case codeView:
 			if reportData != nil {
 				values = append(values, reportData.CodeMap)
+			} else {
+				values = append(values, nil)
+			}
+		case concurrencyView:
+			if reportData != nil {
+				values = append(values, reportData.Concurrency)
 			} else {
 				values = append(values, nil)
 			}

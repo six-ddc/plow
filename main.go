@@ -19,6 +19,7 @@ import (
 var (
 	concurrency = kingpin.Flag("concurrency", "Number of connections to run concurrently").Short('c').Default("1").Int()
 	reqRate     = rateFlag(kingpin.Flag("rate", "Number of requests per time unit, examples: --rate 50 --rate 10/ms").Default("infinity"))
+	rampUp      = kingpin.Flag("ramp-up", "Concurrently will increase pre seconds").Default("-1").Int()
 	requests    = kingpin.Flag("requests", "Number of requests to run").Short('n').Default("-1").Int64()
 	duration    = kingpin.Flag("duration", "Duration of test, examples: -d 10s -d 3m").Short('d').PlaceHolder("DURATION").Duration()
 	interval    = kingpin.Flag("interval", "Print snapshot result every interval, use 0 to print once at the end").Short('i').Default("200ms").Duration()
@@ -259,7 +260,7 @@ func main() {
 		host:        *host,
 	}
 
-	requester, err := NewRequester(*concurrency, *requests, *duration, reqRate.Limit(), errWriter, &clientOpt)
+	requester, err := NewRequester(*concurrency, *requests, *duration, reqRate.Limit(), errWriter, &clientOpt, *rampUp)
 	if err != nil {
 		errAndExit(err.Error())
 		return
@@ -273,6 +274,9 @@ func main() {
 	}
 	if *duration > 0 {
 		desc += fmt.Sprintf(" for %s", duration.String())
+	}
+	if *rampUp > 0 {
+		desc += fmt.Sprintf(" with ramp up %d pre second", *rampUp)
 	}
 	desc += fmt.Sprintf(" using %d connection(s).", *concurrency)
 	fmt.Fprintln(os.Stderr, desc)
