@@ -23,8 +23,8 @@ import (
 )
 
 var (
-	startTime        = time.Now()
-	sendOnCloseError interface{}
+	startTimeUnixNano int64
+	sendOnCloseError  interface{}
 )
 
 type ReportRecord struct {
@@ -249,6 +249,7 @@ func (r *Requester) closeRecord() {
 }
 
 func (r *Requester) DoRequest(req *fasthttp.Request, resp *fasthttp.Response, rr *ReportRecord) {
+	startTime := time.Unix(0, atomic.LoadInt64(&startTimeUnixNano))
 	t1 := time.Since(startTime)
 	var err error
 	if r.clientOpt.doTimeout > 0 {
@@ -294,7 +295,7 @@ func (r *Requester) Run() {
 		r.closeRecord()
 		cancelFunc()
 	}()
-	startTime = time.Now()
+	atomic.StoreInt64(&startTimeUnixNano, time.Now().UnixNano())
 	if r.duration > 0 {
 		time.AfterFunc(r.duration, func() {
 			r.closeRecord()
