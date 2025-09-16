@@ -53,6 +53,7 @@ var (
 	summary         = kingpin.Flag("summary", "Only print the summary without realtime reports").Default("false").Bool()
 	pprofAddr       = kingpin.Flag("pprof", "Enable pprof at special address").Hidden().String()
 	url             = kingpin.Arg("url", "Request url").Required().String()
+	unixSocket      = kingpin.Flag("unix-socket", "Unix domain socket path to use for connection").String()
 )
 
 // dynamically set by GoReleaser
@@ -258,6 +259,7 @@ func main() {
 		socks5Proxy: *socks5,
 		contentType: *contentType,
 		host:        *host,
+		unixSocket:  *unixSocket,
 	}
 
 	requester, err := NewRequester(*concurrency, *requests, *duration, reqRate.Limit(), errWriter, &clientOpt, *rampUp)
