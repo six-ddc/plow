@@ -102,38 +102,42 @@ Examples:
   plow https://httpbin.org/post -c 20 -d 5m --body @file.json -T 'application/json' -m POST
 
 Flags:
-      --help                   Show context-sensitive help.
-  -c, --concurrency=1          Number of connections to run concurrently
-      --rate=infinity          Number of requests per time unit, examples: --rate 50 --rate 10/ms
-  -n, --requests=-1            Number of requests to run
-  -d, --duration=DURATION      Duration of test, examples: -d 10s -d 3m
-  -i, --interval=200ms         Print snapshot result every interval, use 0 to print once at the end
-      --seconds                Use seconds as time unit to print
-      --json                   Print snapshot result as JSON
-  -b, --body=BODY              HTTP request body, if start the body with @, the rest should be a filename to read
-      --stream                 Specify whether to stream file specified by '--body @file' using chunked encoding or to read into memory
-  -m, --method="GET"           HTTP method
-  -H, --header=K:V ...         Custom HTTP headers
-      --host=HOST              Host header
-  -T, --content=CONTENT        Content-Type header
-      --cert=CERT              Path to the client's TLS Certificate
-      --key=KEY                Path to the client's TLS Certificate Private Key
-  -k, --insecure               Controls whether a client verifies the server's certificate chain and host name
-      --listen=":18888"        Listen addr to serve Web UI
-      --timeout=DURATION       Timeout for each http request
-      --dial-timeout=DURATION  Timeout for dial addr
-      --req-timeout=DURATION   Timeout for full request writing
-      --resp-timeout=DURATION  Timeout for full response reading
-      --socks5=ip:port         Socks5 proxy
-      --auto-open-browser      Specify whether auto open browser to show Web charts
-      --[no-]clean             Clean the histogram bar once its finished. Default is true
-      --summary                Only print the summary without realtime reports
-      --version                Show application version.
+      --help                     Show context-sensitive help.
+  -c, --concurrency=1            Number of connections to run concurrently
+      --rate=infinity            Number of requests per time unit, examples: --rate 50 --rate 10/ms
+      --ramp-up=-1               Concurrently will increase pre seconds
+  -n, --requests=-1              Number of requests to run
+  -d, --duration=DURATION        Duration of test, examples: -d 10s -d 3m
+  -i, --interval=200ms           Print snapshot result every interval, use 0 to print once at the end
+      --seconds                  Use seconds as time unit to print
+      --json                     Print snapshot result as JSON
+  -b, --body=BODY                HTTP request body, if body starts with '@' the rest will be considered a file's path from which to read the actual body content
+      --stream                   Specify whether to stream file specified by '--body @file' using chunked encoding or to read into memory
+  -m, --method="GET"             HTTP method
+  -H, --header=K:V ...           Custom HTTP headers
+      --host=HOST                Host header
+  -T, --content=CONTENT          Content-Type header
+      --cert=CERT                Path to the client's TLS Certificate
+      --key=KEY                  Path to the client's TLS Certificate Private Key
+  -k, --insecure                 Controls whether a client verifies the server's certificate chain and host name
+      --listen=":18888"          Listen addr to serve Web UI
+      --timeout=DURATION         Timeout for each http request
+      --dial-timeout=DURATION    Timeout for dial addr
+      --req-timeout=DURATION     Timeout for full request writing
+      --resp-timeout=DURATION    Timeout for full response reading
+      --socks5=ip:port           Socks5 proxy
+      --auto-open-browser        Specify whether auto open browser to show web charts
+      --[no-]clean               Clean the histogram bar once its finished. Default is true
+      --output-errors=OUTPUT-ERRORS  
+                                 Output errors to file
+      --summary                  Only print the summary without realtime reports
+      --unix-socket=UNIX-SOCKET  Unix domain socket path to use for connection
+      --version                  Show application version.
 
   Flags default values also read from env PLOW_SOME_FLAG, such as PLOW_TIMEOUT=5s equals to --timeout=5s
 
 Args:
-  <url>  request url
+  <url>  Request url
 ```
 
 ### Examples
