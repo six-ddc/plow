@@ -46,6 +46,7 @@ var (
 	reqWriteTimeout  = kingpin.Flag("req-timeout", "Timeout for full request writing").PlaceHolder("DURATION").Duration()
 	respReadTimeout  = kingpin.Flag("resp-timeout", "Timeout for full response reading").PlaceHolder("DURATION").Duration()
 	socks5           = kingpin.Flag("socks5", "Socks5 proxy").PlaceHolder("ip:port").String()
+	httpProxy        = kingpin.Flag("http-proxy","Set HTTP proxy").PlaceHolder("username:password@ip:port").String()
 
 	autoOpenBrowser = kingpin.Flag("auto-open-browser", "Specify whether auto open browser to show web charts").Bool()
 	clean           = kingpin.Flag("clean", "Clean the histogram bar once its finished. Default is true").Default("true").NegatableBool()
@@ -257,6 +258,7 @@ func main() {
 		dialTimeout:  *dialTimeout,
 
 		socks5Proxy: *socks5,
+		httpProxy:   *httpProxy,
 		contentType: *contentType,
 		host:        *host,
 		unixSocket:  *unixSocket,

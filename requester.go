@@ -131,6 +131,7 @@ type ClientOpt struct {
 	dialTimeout  time.Duration
 
 	socks5Proxy string
+	httpProxy   string
 	contentType string
 	host        string
 	unixSocket  string
@@ -210,6 +211,8 @@ func buildRequestClient(opt *ClientOpt, r *int64, w *int64) (*fasthttp.HostClien
 		httpClient.Dial = func(addr string) (net.Conn, error) {
 			return net.Dial("unix", opt.unixSocket)
 		}
+	} else if opt.httpProxy != "" {
+		httpClient.Dial = fasthttpproxy.FasthttpHTTPDialerDualStack(opt.httpProxy)
 	} else {
 		httpClient.Dial = fasthttpproxy.FasthttpProxyHTTPDialerTimeout(opt.dialTimeout)
 	}

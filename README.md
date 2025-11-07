@@ -126,6 +126,8 @@ Flags:
       --req-timeout=DURATION     Timeout for full request writing
       --resp-timeout=DURATION    Timeout for full response reading
       --socks5=ip:port           Socks5 proxy
+      --http-proxy=username:password@ip:port
+                                 Set HTTP proxy
       --auto-open-browser        Specify whether auto open browser to show web charts
       --[no-]clean               Clean the histogram bar once its finished. Default is true
       --output-errors=OUTPUT-ERRORS  
