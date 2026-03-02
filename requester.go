@@ -328,7 +328,7 @@ func (r *Requester) Run() {
 	loopCount := int(math.Ceil(float64(r.concurrency) / float64(r.rampUp)))
 	for i := 0; i < loopCount; i++ {
 		for j := 0; j < r.rampUp; j++ {
-			if concurrencyCount > r.concurrency {
+			if concurrencyCount >= r.concurrency {
 				break
 			}
 			concurrencyCount++

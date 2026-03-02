@@ -119,7 +119,7 @@ function {{ .ViewID }}_sync() {
 					}else{
 						let data = [];
 						for (let i = 0; i < code200Count; i++) {
-							data.push[null];
+							data.push(null);
 						}
 						var newSeries = {
 							name:  code,

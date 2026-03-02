@@ -244,7 +244,7 @@ func (s *StreamReport) Snapshot() *SnapshotReport {
 	rs.Codes = make(map[string]int64, len(s.codes))
 	for k, v := range s.codes {
 		section := k / 100
-		rs.Codes[httpStatusSectionLabelMap[section]] = v
+		rs.Codes[httpStatusSectionLabelMap[section]] += v
 	}
 	rs.Errors = make(map[string]int64, len(s.errors))
 	for k, v := range s.errors {

@@ -382,7 +382,6 @@ func (p *Printer) buildJSONErrors(writer *bytes.Buffer, snapshot *SnapshotReport
 	tab1 := strings.Repeat("  ", indent+1)
 	errors := sortMapStrInt(snapshot.Errors)
 	for i, v := range errors {
-		v[1] = colorize(v[1], FgRedColor)
 		vb, _ := json.Marshal(v[0])
 		writer.WriteString(fmt.Sprintf(`%s%s: %s`, tab1, vb, v[1]))
 		if i != len(errors)-1 {
@@ -427,9 +426,6 @@ func (p *Printer) buildJSONSummary(writer *bytes.Buffer, snapshot *SnapshotRepor
 		codes := sortMapStrInt(snapshot.Codes)
 		for _, v := range codes {
 			i++
-			if v[0] != "2xx" {
-				v[1] = colorize(v[1], FgMagentaColor)
-			}
 			writer.WriteString(fmt.Sprintf(`%s"%s": %s`, tab2, v[0], v[1]))
 			if i != len(snapshot.Codes) {
 				writer.WriteString(",")
