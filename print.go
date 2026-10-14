@@ -14,6 +14,7 @@ import (
 
 	"github.com/mattn/go-isatty"
 	"github.com/mattn/go-runewidth"
+	"golang.org/x/term"
 )
 
 var (
@@ -84,6 +85,14 @@ func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Durat
 			p.formatTableReports(&buf, report, isFinal, useSeconds)
 		}
 		result := buf.Bytes()
+		cols := 0
+		if isTerminal {
+			var rows int
+			var err error
+			if cols, rows, err = term.GetSize(int(os.Stdout.Fd())); err == nil && !isFinal {
+				result = fitScreen(result, cols, rows)
+			}
+		}
 		n := 0
 		for {
 			i := bytes.IndexByte(result, '\n')
@@ -92,15 +101,17 @@ func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Durat
 				os.Stdout.Write(result)
 				break
 			}
-			n++
+			n += screenRows(result[:i], cols)
 			os.Stdout.Write(cl)
 			os.Stdout.Write(result[:i])
 			os.Stdout.Write([]byte("\n"))
 			result = result[i+1:]
 		}
 		os.Stdout.Sync()
-		if isTerminal {
-			backCursor = fmt.Sprintf("\033[%dA", n)
+		if isTerminal && n > 0 {
+			backCursor = fmt.Sprintf("\033[%dA\033[J", n)
+		} else {
+			backCursor = ""
 		}
 	}
 
@@ -475,6 +486,37 @@ func (p *Printer) buildSummary(snapshot *SnapshotReport, isFinal bool) [][]strin
 }
 
 var ansi = regexp.MustCompile("\033\\[(?:[0-9]{1,3}(?:;[0-9]{1,3})*)?[m|K]")
+
+func screenRows(line []byte, cols int) int {
+	if cols <= 0 {
+		return 1
+	}
+	w := displayWidth(string(line))
+	if w <= cols {
+		return 1
+	}
+	return (w + cols - 1) / cols
+}
+
+func fitScreen(report []byte, cols, rows int) []byte {
+	lines := bytes.SplitAfter(report, []byte("\n"))
+	if len(lines[len(lines)-1]) == 0 {
+		lines = lines[:len(lines)-1]
+	}
+	maxRows := rows - 2
+	used := 0
+	for i, line := range lines {
+		used += screenRows(bytes.TrimSuffix(line, []byte("\n")), cols)
+		if used > maxRows {
+			if i == 0 {
+				return nil
+			}
+			res := bytes.Join(lines[:i], nil)
+			return append(res, fmt.Sprintf("... (%d more lines)\n", len(lines)-i)...)
+		}
+	}
+	return report
+}
 
 func displayWidth(str string) int {
 	return runewidth.StringWidth(ansi.ReplaceAllLiteralString(str, ""))

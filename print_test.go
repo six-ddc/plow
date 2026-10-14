@@ -138,3 +138,47 @@ func TestAlignBulkPadsColumns(t *testing.T) {
 		t.Fatalf("second column = %q, want right aligned", bulk[0][1])
 	}
 }
+
+func TestScreenRowsCountsWrappedLines(t *testing.T) {
+	tests := []struct {
+		line string
+		cols int
+		want int
+	}{
+		{"", 80, 1},
+		{strings.Repeat("a", 80), 80, 1},
+		{strings.Repeat("a", 81), 80, 2},
+		{strings.Repeat("a", 200), 80, 3},
+		{"\033[32m" + strings.Repeat("a", 80) + "\033[0m", 80, 1},
+		{strings.Repeat("a", 200), 0, 1},
+	}
+	for _, tt := range tests {
+		if got := screenRows([]byte(tt.line), tt.cols); got != tt.want {
+			t.Errorf("screenRows(len %d, cols %d) = %d, want %d", len(tt.line), tt.cols, got, tt.want)
+		}
+	}
+}
+
+func TestFitScreenKeepsReportThatFits(t *testing.T) {
+	report := []byte("a\nb\nc\n")
+	if got := fitScreen(report, 80, 5); !bytes.Equal(got, report) {
+		t.Fatalf("fitScreen() = %q, want %q", got, report)
+	}
+}
+
+func TestFitScreenTruncatesTallReport(t *testing.T) {
+	report := []byte("1\n2\n3\n4\n5\n6\n")
+	want := "1\n2\n3\n... (3 more lines)\n"
+	if got := fitScreen(report, 80, 5); string(got) != want {
+		t.Fatalf("fitScreen() = %q, want %q", got, want)
+	}
+}
+
+func TestFitScreenCountsWrappedRows(t *testing.T) {
+	long := strings.Repeat("x", 30)
+	report := []byte("1\n" + long + "\n3\n4\n")
+	want := "1\n... (3 more lines)\n"
+	if got := fitScreen(report, 10, 5); string(got) != want {
+		t.Fatalf("fitScreen() = %q, want %q", got, want)
+	}
+}
