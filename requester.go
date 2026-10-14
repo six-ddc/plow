@@ -104,6 +104,7 @@ type Requester struct {
 	errWriter   io.Writer
 
 	recordChan chan *ReportRecord
+	tracer     *PhaseTracer
 	closeOnce  sync.Once
 	wg         sync.WaitGroup
 
@@ -137,7 +138,7 @@ type ClientOpt struct {
 	unixSocket  string
 }
 
-func NewRequester(concurrency int, requests int64, duration time.Duration, reqRate *rate.Limit, errWriter io.Writer, clientOpt *ClientOpt, rampUp int) (*Requester, error) {
+func NewRequester(concurrency int, requests int64, duration time.Duration, reqRate *rate.Limit, errWriter io.Writer, clientOpt *ClientOpt, rampUp int, trace bool) (*Requester, error) {
 	maxResult := concurrency * 100
 	if maxResult > 8192 {
 		maxResult = 8192
@@ -152,7 +153,10 @@ func NewRequester(concurrency int, requests int64, duration time.Duration, reqRa
 		clientOpt:   clientOpt,
 		recordChan:  make(chan *ReportRecord, maxResult),
 	}
-	client, header, err := buildRequestClient(clientOpt, &r.readBytes, &r.writeBytes)
+	if trace {
+		r.tracer = NewPhaseTracer()
+	}
+	client, header, err := buildRequestClient(clientOpt, &r.readBytes, &r.writeBytes, r.tracer)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +191,7 @@ func buildTLSConfig(opt *ClientOpt) (*tls.Config, error) {
 	}, nil
 }
 
-func buildRequestClient(opt *ClientOpt, r *int64, w *int64) (*fasthttp.HostClient, *fasthttp.RequestHeader, error) {
+func buildRequestClient(opt *ClientOpt, r *int64, w *int64, tracer *PhaseTracer) (*fasthttp.HostClient, *fasthttp.RequestHeader, error) {
 	u, err := url2.Parse(opt.url)
 	if err != nil {
 		return nil, nil, err
@@ -201,35 +205,53 @@ func buildRequestClient(opt *ClientOpt, r *int64, w *int64) (*fasthttp.HostClien
 		WriteTimeout:                  opt.writeTimeout,
 		DisableHeaderNamesNormalizing: true,
 	}
+	// the base dialer: the socks5/http proxy, the unix socket, or the proxy from env (dialing directly when no proxy)
+	var dial fasthttp.DialFunc
 	if opt.socks5Proxy != "" {
 		if !strings.Contains(opt.socks5Proxy, "://") {
 			opt.socks5Proxy = "socks5://" + opt.socks5Proxy
 		}
-		httpClient.Dial = fasthttpproxy.FasthttpSocksDialer(opt.socks5Proxy)
+		dial = fasthttpproxy.FasthttpSocksDialer(opt.socks5Proxy)
 	} else if opt.unixSocket != "" {
-		httpClient.Dial = func(addr string) (net.Conn, error) {
+		dial = func(addr string) (net.Conn, error) {
 			return net.Dial("unix", opt.unixSocket)
 		}
 	} else if opt.httpProxy != "" {
-		httpClient.Dial = fasthttpproxy.FasthttpHTTPDialerDualStack(opt.httpProxy)
+		dial = fasthttpproxy.FasthttpHTTPDialerDualStack(opt.httpProxy)
 	} else {
 		dialer := fasthttpproxy.Dialer{
 			Timeout:        opt.dialTimeout,
 			ConnectTimeout: opt.dialTimeout,
 			DialDualStack:  true,
 		}
-		httpClient.Dial, err = dialer.GetDialFunc(true)
+		dial, err = dialer.GetDialFunc(true)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
-	httpClient.Dial = ThroughputInterceptorDial(httpClient.Dial, r, w)
 
 	tlsConfig, err := buildTLSConfig(opt)
 	if err != nil {
 		return nil, nil, err
 	}
 	httpClient.TLSConfig = tlsConfig
+
+	if tracer != nil {
+		handshakeTimeout := opt.dialTimeout
+		if handshakeTimeout <= 0 {
+			handshakeTimeout = opt.writeTimeout
+		}
+		// when dialing directly, TraceDial dials by itself to measure DNS and Connect separately,
+		// while the proxy and unix socket dialers can only be measured as a whole
+		var wholeDial fasthttp.DialFunc
+		if opt.unixSocket != "" || useProxy(opt, httpClient.Addr, httpClient.IsTLS) {
+			wholeDial = dial
+		}
+		httpClient.Dial = TraceDial(wholeDial, httpClient.IsTLS, tlsConfig,
+			opt.dialTimeout, handshakeTimeout, tracer, r, w)
+	} else {
+		httpClient.Dial = ThroughputInterceptorDial(dial, r, w)
+	}
 
 	var requestHeader fasthttp.RequestHeader
 	if opt.contentType != "" {
@@ -261,9 +283,15 @@ func (r *Requester) RecordChan() <-chan *ReportRecord {
 	return r.recordChan
 }
 
+// PhaseRecordChan returns nil when --trace is disabled.
+func (r *Requester) PhaseRecordChan() <-chan PhaseRecord {
+	return r.tracer.Records()
+}
+
 func (r *Requester) closeRecord() {
 	r.closeOnce.Do(func() {
 		close(r.recordChan)
+		r.tracer.Close()
 	})
 }
 

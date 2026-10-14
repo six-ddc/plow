@@ -92,11 +92,13 @@ type StreamReport struct {
 	readBytes  int64
 	writeBytes int64
 
+	phases *phaseStats
+
 	doneChan chan struct{}
 }
 
-func NewStreamReport() *StreamReport {
-	return &StreamReport{
+func NewStreamReport(trace bool) *StreamReport {
+	s := &StreamReport{
 		latencyQuantile:  quantile.NewTargeted(quantilesTarget),
 		latencyHistogram: histogram.New(8),
 		codes:            make(map[int]int64, 1),
@@ -106,6 +108,10 @@ func NewStreamReport() *StreamReport {
 		rpsStats:         &Stats{},
 		latencyWithinSec: &Stats{},
 	}
+	if trace {
+		s.phases = newPhaseStats()
+	}
+	return s
 }
 
 func (s *StreamReport) insert(v float64) {
@@ -114,7 +120,8 @@ func (s *StreamReport) insert(v float64) {
 	s.latencyStats.Update(v)
 }
 
-func (s *StreamReport) Collect(records <-chan *ReportRecord) {
+// Collect receives the records until both channels are closed, phaseRecords is nil when --trace is disabled.
+func (s *StreamReport) Collect(records <-chan *ReportRecord, phaseRecords <-chan PhaseRecord) {
 	latencyWithinSecTemp := &Stats{}
 	go func() {
 		startTime := time.Unix(0, atomic.LoadInt64(&startTimeUnixNano))
@@ -125,6 +132,7 @@ func (s *StreamReport) Collect(records <-chan *ReportRecord) {
 			select {
 			case <-ticker.C:
 				s.lock.Lock()
+				s.phases.rotate()
 				dc := s.latencyStats.count - lastCount
 				if dc > 0 {
 					rps := float64(dc) / time.Since(lastTime).Seconds()
@@ -146,27 +154,38 @@ func (s *StreamReport) Collect(records <-chan *ReportRecord) {
 		}
 	}()
 
-	for {
-		r, ok := <-records
-		if !ok {
-			close(s.doneChan)
-			break
+	for records != nil || phaseRecords != nil {
+		select {
+		case pr, ok := <-phaseRecords:
+			if !ok {
+				phaseRecords = nil
+				continue
+			}
+			s.lock.Lock()
+			s.phases.insert(&pr)
+			s.lock.Unlock()
+		case r, ok := <-records:
+			if !ok {
+				records = nil
+				continue
+			}
+			s.lock.Lock()
+			latencyWithinSecTemp.Update(float64(r.cost))
+			s.insert(float64(r.cost))
+			if r.code != 0 {
+				s.codes[r.code]++
+			}
+			if r.error != "" {
+				s.errors[r.error]++
+			}
+			s.readBytes = r.readBytes
+			s.writeBytes = r.writeBytes
+			s.concurrencyCount = r.concurrencyCount
+			s.lock.Unlock()
+			recordPool.Put(r)
 		}
-		s.lock.Lock()
-		latencyWithinSecTemp.Update(float64(r.cost))
-		s.insert(float64(r.cost))
-		if r.code != 0 {
-			s.codes[r.code]++
-		}
-		if r.error != "" {
-			s.errors[r.error]++
-		}
-		s.readBytes = r.readBytes
-		s.writeBytes = r.writeBytes
-		s.concurrencyCount = r.concurrencyCount
-		s.lock.Unlock()
-		recordPool.Put(r)
 	}
+	close(s.doneChan)
 }
 func (s *StreamReport) copyCodes() map[int]int64 {
 	res := make(map[int]int64, len(s.codes))
@@ -209,6 +228,8 @@ type SnapshotReport struct {
 		Mean  time.Duration
 		Count int
 	}
+
+	Phases []*PhaseSnapshot
 }
 
 func (s *StreamReport) Snapshot() *SnapshotReport {
@@ -274,6 +295,8 @@ func (s *StreamReport) Snapshot() *SnapshotReport {
 		}{time.Duration(b.Mean()), b.Count}
 	}
 
+	rs.Phases = s.phases.snapshot()
+
 	s.lock.Unlock()
 	return rs
 }
@@ -287,6 +310,7 @@ type ChartsReport struct {
 	Latency     Stats
 	CodeMap     map[int]int64
 	Concurrency int
+	Phases      []interface{}
 }
 
 func (s *StreamReport) Charts() *ChartsReport {
@@ -300,6 +324,7 @@ func (s *StreamReport) Charts() *ChartsReport {
 			Latency:     *s.latencyWithinSec,
 			CodeMap:     s.copyCodes(),
 			Concurrency: s.concurrencyCount,
+			Phases:      s.phases.meansWithinSec(),
 		}
 	}
 	s.lock.Unlock()

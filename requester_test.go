@@ -68,7 +68,7 @@ func TestBuildRequestClientUsesDualStackDialer(t *testing.T) {
 			dialTimeout: time.Second,
 			doTimeout:   time.Second,
 		}
-		client, header, err := buildRequestClient(opt, new(int64), new(int64))
+		client, header, err := buildRequestClient(opt, new(int64), new(int64), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -126,7 +126,7 @@ func TestBuildRequestClientUsesHTTPProxy(t *testing.T) {
 				doTimeout:   time.Second,
 				httpProxy:   tt.httpProxy,
 			}
-			client, header, err := buildRequestClient(opt, new(int64), new(int64))
+			client, header, err := buildRequestClient(opt, new(int64), new(int64), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
