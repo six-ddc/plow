@@ -23,7 +23,7 @@ func TestBuildRequestClientConfiguresRequestHeader(t *testing.T) {
 		headers:     []string{" X-Test : friendly \t", "\tX-Trace-ID\t: abc123 "},
 	}
 
-	client, header, err := buildRequestClient(opt, new(int64), new(int64))
+	client, header, err := buildRequestClient(opt, new(int64), new(int64), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestBuildRequestClientConfiguresTLS(t *testing.T) {
 		method:   fasthttp.MethodGet,
 		maxConns: 1,
 		insecure: true,
-	}, new(int64), new(int64))
+	}, new(int64), new(int64), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestBuildRequestClientRejectsInvalidHeader(t *testing.T) {
 		method:   fasthttp.MethodGet,
 		maxConns: 1,
 		headers:  []string{"MissingColon"},
-	}, new(int64), new(int64))
+	}, new(int64), new(int64), nil)
 	if err == nil {
 		t.Fatal("buildRequestClient accepted an invalid header, want error")
 	}
@@ -128,7 +128,7 @@ func TestBuildRequestClientUsesUnixSocket(t *testing.T) {
 		dialTimeout: time.Second,
 		doTimeout:   time.Second,
 		unixSocket:  socketPath,
-	}, new(int64), new(int64))
+	}, new(int64), new(int64), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestRequesterRunSendsConfiguredRequests(t *testing.T) {
 		maxConns:    2,
 		dialTimeout: time.Second,
 		doTimeout:   time.Second,
-	}, -1)
+	}, -1, false)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -219,6 +219,10 @@ func (p *Printer) formatJSONReports(writer *bytes.Buffer, snapshot *SnapshotRepo
 	p.buildJSONPercentile(writer, snapshot, useSeconds, indent)
 	writer.WriteString(",\n")
 	p.buildJSONHistogram(writer, snapshot, useSeconds, indent)
+	if snapshot.Phases != nil {
+		writer.WriteString(",\n")
+		p.buildJSONPhases(writer, snapshot, useSeconds, indent)
+	}
 	writer.WriteString("\n}\n")
 }
 
@@ -248,6 +252,67 @@ func (p *Printer) formatTableReports(writer *bytes.Buffer, snapshot *SnapshotRep
 
 	writer.WriteString("Latency Histogram:\n")
 	writeBulk(writer, hisBulk)
+
+	if snapshot.Phases != nil {
+		writer.WriteString("\n")
+		writeBulkWith(writer, p.buildPhases(snapshot, useSeconds), "", "  ", "\n")
+	}
+}
+
+func phasePercentileLabels() []string {
+	labels := make([]string, 0, len(phaseQuantiles))
+	for _, q := range phaseQuantiles {
+		labels = append(labels, "P"+formatFloat64(q*100))
+	}
+	return labels
+}
+
+func (p *Printer) buildPhases(snapshot *SnapshotReport, useSeconds bool) [][]string {
+	header := []string{"Latency Phases", "Count", "Min", "Mean"}
+	header = append(header, phasePercentileLabels()...)
+	header = append(header, "Max")
+	bulk := [][]string{header}
+	for _, ph := range snapshot.Phases {
+		row := []string{"  " + ph.Name, strconv.FormatInt(ph.Count, 10)}
+		if ph.Count == 0 {
+			for i := 2; i < len(header); i++ {
+				row = append(row, "-")
+			}
+		} else {
+			row = append(row, durationToString(ph.Min, useSeconds), durationToString(ph.Mean, useSeconds))
+			for _, v := range ph.Percentiles {
+				row = append(row, durationToString(v, useSeconds))
+			}
+			row = append(row, durationToString(ph.Max, useSeconds))
+		}
+		bulk = append(bulk, row)
+	}
+	aligns := []int{AlignLeft, AlignRight}
+	for i := 2; i < len(header); i++ {
+		aligns = append(aligns, AlignCenter)
+	}
+	alignBulk(bulk, aligns...)
+	return bulk
+}
+
+func (p *Printer) buildJSONPhases(writer *bytes.Buffer, snapshot *SnapshotReport, useSeconds bool, indent int) {
+	tab0 := strings.Repeat("  ", indent)
+	writer.WriteString(tab0 + "\"Phases\": {\n")
+	tab1 := strings.Repeat("  ", indent+1)
+	labels := phasePercentileLabels()
+	for i, ph := range snapshot.Phases {
+		writer.WriteString(fmt.Sprintf(`%s"%s": { "Count": %d, "Min": "%s", "Mean": "%s"`, tab1, ph.Name, ph.Count,
+			durationToString(ph.Min, useSeconds), durationToString(ph.Mean, useSeconds)))
+		for j, v := range ph.Percentiles {
+			writer.WriteString(fmt.Sprintf(`, "%s": "%s"`, labels[j], durationToString(v, useSeconds)))
+		}
+		writer.WriteString(fmt.Sprintf(`, "Max": "%s" }`, durationToString(ph.Max, useSeconds)))
+		if i != len(snapshot.Phases)-1 {
+			writer.WriteString(",")
+		}
+		writer.WriteString("\n")
+	}
+	writer.WriteString(tab0 + "}")
 }
 
 func (p *Printer) buildJSONHistogram(writer *bytes.Buffer, snapshot *SnapshotReport, useSeconds bool, indent int) {

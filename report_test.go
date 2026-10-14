@@ -43,11 +43,11 @@ func TestStreamReportCollectAndSnapshot(t *testing.T) {
 	t.Cleanup(func() { atomic.StoreInt64(&startTimeUnixNano, oldStartTime) })
 	atomic.StoreInt64(&startTimeUnixNano, time.Now().Add(-2*time.Second).UnixNano())
 
-	report := NewStreamReport()
+	report := NewStreamReport(false)
 	records := make(chan *ReportRecord, 3)
 	done := make(chan struct{})
 	go func() {
-		report.Collect(records)
+		report.Collect(records, nil)
 		close(done)
 	}()
 
@@ -95,7 +95,7 @@ func TestStreamReportCollectAndSnapshot(t *testing.T) {
 }
 
 func TestStreamReportCharts(t *testing.T) {
-	report := NewStreamReport()
+	report := NewStreamReport(false)
 
 	report.lock.Lock()
 	report.latencyWithinSec.Update(float64(10 * time.Millisecond))

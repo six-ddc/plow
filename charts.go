@@ -34,6 +34,7 @@ var (
 	rpsView         = "rps"
 	codeView        = "code"
 	concurrencyView = "concurrency"
+	phasesView      = "phases"
 	timeFormat      = "15:04:05"
 	refreshInterval = time.Second
 
@@ -42,6 +43,7 @@ var (
 		latencyView:     ViewTpl,
 		codeView:        CodeViewTpl,
 		concurrencyView: ViewTpl,
+		phasesView:      ViewTpl,
 	}
 )
 
@@ -226,6 +228,20 @@ func (c *Charts) newConcurrencyView() components.Charter {
 	return graph
 }
 
+func (c *Charts) newPhasesView() components.Charter {
+	graph := c.newBasicView(phasesView)
+	graph.SetGlobalOptions(
+		charts.WithTitleOpts(opts.Title{Title: "Latency Phases (Mean)"}),
+		charts.WithYAxisOpts(opts.YAxis{Scale: opts.Bool(true), AxisLabel: &opts.AxisLabel{Formatter: "{value} ms"}}),
+		// the title is long and there are 6 series, put the legend below the title to avoid overlapping
+		charts.WithLegendOpts(opts.Legend{Show: opts.Bool(true), Top: "30"}),
+	)
+	for _, name := range phaseNames {
+		graph.AddSeries(name, []opts.LineData{})
+	}
+	return graph
+}
+
 type Metrics struct {
 	Values []interface{} `json:"values"`
 	Time   string        `json:"time"`
@@ -237,7 +253,7 @@ type Charts struct {
 	dataFunc func() *ChartsReport
 }
 
-func NewCharts(ln net.Listener, dataFunc func() *ChartsReport, desc string) (*Charts, error) {
+func NewCharts(ln net.Listener, dataFunc func() *ChartsReport, desc string, withPhases bool) (*Charts, error) {
 	templates.PageTpl = fmt.Sprintf(PageTpl, desc)
 
 	c := &Charts{ln: ln, dataFunc: dataFunc}
@@ -246,6 +262,9 @@ func NewCharts(ln net.Listener, dataFunc func() *ChartsReport, desc string) (*Ch
 	c.page.AssetsHost = assetsPath
 	c.page.Assets.JSAssets.Add("jquery.min.js")
 	c.page.AddCharts(c.newLatencyView(), c.newRPSView(), c.newCodeView(), c.newConcurrencyView())
+	if withPhases {
+		c.page.AddCharts(c.newPhasesView())
+	}
 
 	return c, nil
 }
@@ -282,6 +301,12 @@ func (c *Charts) Handler(ctx *fasthttp.RequestCtx) {
 				values = append(values, reportData.Concurrency)
 			} else {
 				values = append(values, nil)
+			}
+		case phasesView:
+			if reportData != nil && reportData.Phases != nil {
+				values = reportData.Phases
+			} else {
+				values = make([]interface{}, len(phaseNames))
 			}
 		}
 		metrics := &Metrics{

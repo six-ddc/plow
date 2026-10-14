@@ -12,6 +12,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.16
 	github.com/valyala/fasthttp v1.70.0
 	go.uber.org/automaxprocs v1.6.0
+	golang.org/x/net v0.50.0
 	golang.org/x/term v0.40.0
 	golang.org/x/time v0.8.0
 	gopkg.in/alecthomas/kingpin.v3-unstable v3.0.0-20191105091915-95d230a53780
@@ -25,7 +26,6 @@ require (
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	golang.org/x/net v0.50.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect

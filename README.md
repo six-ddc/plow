@@ -111,6 +111,7 @@ Flags:
   -i, --interval=200ms           Print snapshot result every interval, use 0 to print once at the end
       --seconds                  Use seconds as time unit to print
       --json                     Print snapshot result as JSON
+      --trace                    Trace latency of request phases: DNS, Connect, TLS, Write, Wait(TTFB), Read
   -b, --body=BODY                HTTP request body, if body starts with '@' the rest will be considered a file's path from which to read the actual body content
       --stream                   Specify whether to stream file specified by '--body @file' using chunked encoding or to read into memory
   -m, --method="GET"             HTTP method
@@ -155,6 +156,27 @@ POST a json file:
 ```bash
 plow https://httpbin.org/post -c 20 --body @file.json -T 'application/json' -m POST
 ```
+
+Trace latency of request phases:
+
+```bash
+plow http://localhost:8080/ -c 20 -d 4s --trace
+```
+
+```text
+Latency Phases  Count    Min     Mean      P50      P90      P99      Max
+  DNS              20  2.963ms  4.073ms  3.785ms  5.381ms  5.565ms  5.565ms
+  Connect          20   226µs   1.025ms  1.014ms   1.8ms   2.475ms  2.475ms
+  TLS               0     -        -        -        -        -        -
+  Write         12894    3µs      9µs      6µs     11µs     112µs    783µs
+  Wait          12894  4.869ms  5.758ms  5.585ms  6.332ms  8.845ms  25.494ms
+  Read          12894   70µs     253µs    178µs    426µs   1.231ms  17.633ms
+```
+
+- `DNS`, `Connect` and `TLS` are only measured when a new connection is established, so their counts are the number of connections.
+- `Write` is the time of writing the request, `Wait` is the time from the request written to the first response byte (TTFB), `Read` is the time of reading the rest of the response.
+- When a proxy is used (`--socks5` or `HTTP(S)_PROXY` env), the whole proxy dialing is measured as `Connect`.
+- The mean latency of each phase per second is also shown in the Web charts.
 
 ### Bash/ZSH Shell Completion
 

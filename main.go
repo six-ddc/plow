@@ -25,6 +25,7 @@ var (
 	interval    = kingpin.Flag("interval", "Print snapshot result every interval, use 0 to print once at the end").Short('i').Default("200ms").Duration()
 	seconds     = kingpin.Flag("seconds", "Use seconds as time unit to print").Bool()
 	jsonFormat  = kingpin.Flag("json", "Print snapshot result as JSON").Bool()
+	trace       = kingpin.Flag("trace", "Trace latency of request phases: DNS, Connect, TLS, Write, Wait(TTFB), Read").Bool()
 
 	body      = kingpin.Flag("body", "HTTP request body, if body starts with '@' the rest will be considered a file's path from which to read the actual body content").Short('b').String()
 	stream    = kingpin.Flag("stream", "Specify whether to stream file specified by '--body @file' using chunked encoding or to read into memory").Default("false").Bool()
@@ -264,7 +265,7 @@ func main() {
 		unixSocket:  *unixSocket,
 	}
 
-	requester, err := NewRequester(*concurrency, *requests, *duration, reqRate.Limit(), errWriter, &clientOpt, *rampUp)
+	requester, err := NewRequester(*concurrency, *requests, *duration, reqRate.Limit(), errWriter, &clientOpt, *rampUp, *trace)
 	if err != nil {
 		errAndExit(err.Error())
 		return
@@ -301,12 +302,12 @@ func main() {
 	go requester.Run()
 
 	// metrics collection
-	report := NewStreamReport()
-	go report.Collect(requester.RecordChan())
+	report := NewStreamReport(*trace)
+	go report.Collect(requester.RecordChan(), requester.PhaseRecordChan())
 
 	if ln != nil {
 		// serve charts data
-		charts, err := NewCharts(ln, report.Charts, desc)
+		charts, err := NewCharts(ln, report.Charts, desc, *trace)
 		if err != nil {
 			errAndExit(err.Error())
 			return

@@ -23,7 +23,7 @@ func newTestCharts(t *testing.T, dataFunc func() *ChartsReport) *Charts {
 	}
 	t.Cleanup(func() { _ = ln.Close() })
 
-	charts, err := NewCharts(ln, dataFunc, "test benchmark")
+	charts, err := NewCharts(ln, dataFunc, "test benchmark", false)
 	if err != nil {
 		t.Fatal(err)
 	}
