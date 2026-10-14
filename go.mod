@@ -12,6 +12,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.16
 	github.com/valyala/fasthttp v1.70.0
 	go.uber.org/automaxprocs v1.6.0
+	golang.org/x/term v0.40.0
 	golang.org/x/time v0.8.0
 	gopkg.in/alecthomas/kingpin.v3-unstable v3.0.0-20191105091915-95d230a53780
 )
