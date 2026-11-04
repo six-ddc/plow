@@ -47,7 +47,7 @@ var (
 	reqWriteTimeout  = kingpin.Flag("req-timeout", "Timeout for full request writing").PlaceHolder("DURATION").Duration()
 	respReadTimeout  = kingpin.Flag("resp-timeout", "Timeout for full response reading").PlaceHolder("DURATION").Duration()
 	socks5           = kingpin.Flag("socks5", "Socks5 proxy").PlaceHolder("ip:port").String()
-	httpProxy        = kingpin.Flag("http-proxy","Set HTTP proxy").PlaceHolder("username:password@ip:port").String()
+	httpProxy        = kingpin.Flag("http-proxy", "Set HTTP proxy").PlaceHolder("username:password@ip:port").String()
 
 	autoOpenBrowser = kingpin.Flag("auto-open-browser", "Specify whether auto open browser to show web charts").Bool()
 	clean           = kingpin.Flag("clean", "Clean the histogram bar once its finished. Default is true").Default("true").NegatableBool()
@@ -56,6 +56,10 @@ var (
 	pprofAddr       = kingpin.Flag("pprof", "Enable pprof at special address").Hidden().String()
 	url             = kingpin.Arg("url", "Request url").Required().String()
 	unixSocket      = kingpin.Flag("unix-socket", "Unix domain socket path to use for connection").String()
+
+	recordHistory = kingpin.Flag("history", "Record this run in the history to browse by \"plow history\"").Bool()
+	historyDir    = kingpin.Flag("history-dir", "Directory to record the history, default is ~/.plow/history").PlaceHolder("DIR").String()
+	label         = kingpin.Flag("label", "Mark this run with a label, such as the change being tested").String()
 )
 
 // dynamically set by GoReleaser
@@ -183,11 +187,16 @@ func rateFlag(c *kingpin.Clause) (target *rateFlagValue) {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "history" {
+		startHistoryServer(os.Args[2:])
+		return
+	}
+
 	kingpin.UsageTemplate(CompactUsageTemplate).
 		Version(version).
 		Author("six-ddc@github").
 		Resolver(kingpin.PrefixedEnvarResolver("PLOW_", ";")).
-		Help = `A high-performance HTTP benchmarking tool with real-time web UI and terminal displaying`
+		Help = `A high-performance HTTP benchmarking tool with real-time web UI and terminal displaying, use --history to record a run and "plow history" to browse the recorded runs`
 	kingpin.Parse()
 
 	if *requests >= 0 && *requests < int64(*concurrency) {
@@ -284,6 +293,9 @@ func main() {
 		desc += fmt.Sprintf(" with ramp up %d pre second", *rampUp)
 	}
 	desc += fmt.Sprintf(" using %d connection(s).", *concurrency)
+	if *label != "" {
+		desc += fmt.Sprintf(" Label: %s", *label)
+	}
 	fmt.Fprintln(os.Stderr, desc)
 
 	// charts listener
@@ -298,11 +310,20 @@ func main() {
 	}
 	fmt.Fprintln(os.Stderr, "")
 
-	// do request
-	go requester.Run()
-
 	// metrics collection
 	report := NewStreamReport(*trace)
+	var history *History
+	if *recordHistory {
+		history, err = NewHistory(*historyDir)
+		if err != nil {
+			errAndExit(err.Error())
+			return
+		}
+		history.Record(report.Seconds())
+	}
+
+	// do request
+	go requester.Run()
 	go report.Collect(requester.RecordChan(), requester.PhaseRecordChan())
 
 	if ln != nil {
@@ -317,5 +338,28 @@ func main() {
 
 	// terminal printer
 	printer := NewPrinter(*requests, *duration, !*clean, *summary)
-	printer.PrintLoop(report.Snapshot, *interval, *seconds, *jsonFormat, report.Done())
+	final := printer.PrintLoop(report.Snapshot, *interval, *seconds, *jsonFormat, report.Done())
+
+	if history != nil && final.Count > 0 {
+		run := &HistoryRun{
+			Interrupted: requester.Interrupted(),
+			Label:       *label,
+			Options: HistoryOptions{
+				URL:         *url,
+				Method:      *method,
+				Concurrency: *concurrency,
+				Requests:    *requests,
+				Duration:    *duration,
+				Rate:        reqRate.String(),
+				Trace:       *trace,
+				RampUp:      *rampUp,
+				Fingerprint: requestFingerprint(&clientOpt),
+			},
+		}
+		if path, err := history.Save(run, final); err != nil {
+			fmt.Fprintf(os.Stderr, "plow: failed to save the history: %v\n", err)
+		} else {
+			fmt.Fprintf(os.Stderr, "\nSaved to %s, run \"plow history\" to browse and compare the runs\n", path)
+		}
+	}
 }
