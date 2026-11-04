@@ -317,15 +317,7 @@ func (c *Charts) Handler(ctx *fasthttp.RequestCtx) {
 	} else if path == "/" {
 		ctx.SetContentType("text/html")
 		_ = c.page.Render(ctx)
-	} else if strings.HasPrefix(path, assetsPath) {
-		ap := path[len(assetsPath):]
-		f, err := assetsFS.Open(ap)
-		if err != nil {
-			ctx.Error(err.Error(), 404)
-		} else {
-			ctx.SetBodyStream(f, -1)
-		}
-	} else {
+	} else if !serveAsset(ctx) {
 		ctx.Error("NotFound", fasthttp.StatusNotFound)
 	}
 }
@@ -338,6 +330,21 @@ func (c *Charts) Serve(open bool) {
 		go openBrowser("http://" + c.ln.Addr().String())
 	}
 	_ = server.Serve(c.ln)
+}
+
+// serveAsset serves the embedded echarts and jquery, returns false for the other paths.
+func serveAsset(ctx *fasthttp.RequestCtx) bool {
+	path := string(ctx.Path())
+	if !strings.HasPrefix(path, assetsPath) {
+		return false
+	}
+	f, err := assetsFS.Open(path[len(assetsPath):])
+	if err != nil {
+		ctx.Error(err.Error(), 404)
+	} else {
+		ctx.SetBodyStream(f, -1)
+	}
+	return true
 }
 
 // openBrowser go/src/cmd/internal/browser/browser.go

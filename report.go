@@ -94,6 +94,9 @@ type StreamReport struct {
 
 	phases *phaseStats
 
+	// the stats of each second are sent to it when it's not nil
+	seconds chan SeriesPoint
+
 	doneChan chan struct{}
 }
 
@@ -124,16 +127,32 @@ func (s *StreamReport) insert(v float64) {
 func (s *StreamReport) Collect(records <-chan *ReportRecord, phaseRecords <-chan PhaseRecord) {
 	latencyWithinSecTemp := &Stats{}
 	go func() {
-		startTime := time.Unix(0, atomic.LoadInt64(&startTimeUnixNano))
 		ticker := time.NewTicker(time.Second)
 		lastCount := int64(0)
-		lastTime := startTime
+		var startTime, lastTime time.Time
 		for {
 			select {
 			case <-ticker.C:
+				// the requester may not start yet when collecting starts
+				if startTime.IsZero() {
+					startTime = time.Unix(0, atomic.LoadInt64(&startTimeUnixNano))
+					lastTime = startTime
+				}
 				s.lock.Lock()
 				s.phases.rotate()
 				dc := s.latencyStats.count - lastCount
+				point := SeriesPoint{
+					Elapsed:     time.Since(startTime).Round(time.Millisecond),
+					Count:       dc,
+					Codes:       s.copyCodes(),
+					Concurrency: s.concurrencyCount,
+				}
+				if s.phases != nil {
+					point.Phases = make([]time.Duration, len(phaseNames))
+					for i := range s.phases.withinSec {
+						point.Phases[i] = time.Duration(s.phases.withinSec[i].Mean())
+					}
+				}
 				if dc > 0 {
 					rps := float64(dc) / time.Since(lastTime).Seconds()
 					s.rpsStats.Update(rps)
@@ -144,11 +163,22 @@ func (s *StreamReport) Collect(records <-chan *ReportRecord, phaseRecords <-chan
 					s.rpsWithinSec = rps
 					latencyWithinSecTemp.Reset()
 					s.noDateWithinSec = false
+
+					point.RPS = rps
+					point.Min = time.Duration(s.latencyWithinSec.min)
+					point.Mean = time.Duration(s.latencyWithinSec.Mean())
+					point.Max = time.Duration(s.latencyWithinSec.max)
 				} else {
 					s.noDateWithinSec = true
 				}
 				s.lock.Unlock()
+				if s.seconds != nil {
+					s.seconds <- point
+				}
 			case <-s.doneChan:
+				if s.seconds != nil {
+					close(s.seconds)
+				}
 				return
 			}
 		}
@@ -329,4 +359,27 @@ func (s *StreamReport) Charts() *ChartsReport {
 	}
 	s.lock.Unlock()
 	return cr
+}
+
+// SeriesPoint is the data of the realtime charts in one second.
+type SeriesPoint struct {
+	// the time since the start at the end of the second
+	Elapsed time.Duration
+	Count   int64
+	RPS     float64
+	Min     time.Duration
+	Mean    time.Duration
+	Max     time.Duration
+	// the count of each status code since the start
+	Codes       map[int]int64
+	Concurrency int
+	// the mean latency of each phase with --trace, 0 for the phase which didn't happen
+	Phases []time.Duration `json:",omitempty"`
+}
+
+// Seconds returns a channel receiving the stats of each second, it's closed when the collecting is done.
+// It must be called before Collect, and the channel must be drained.
+func (s *StreamReport) Seconds() <-chan SeriesPoint {
+	s.seconds = make(chan SeriesPoint, 16)
+	return s.seconds
 }

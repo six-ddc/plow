@@ -66,7 +66,8 @@ func (p *Printer) updateProgressValue(rs *SnapshotReport) {
 	}
 }
 
-func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Duration, useSeconds bool, json bool, doneChan <-chan struct{}) {
+// PrintLoop prints the reports until doneChan is closed, and returns the final report.
+func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Duration, useSeconds bool, json bool, doneChan <-chan struct{}) *SnapshotReport {
 	var buf bytes.Buffer
 
 	var backCursor string
@@ -74,7 +75,7 @@ func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Durat
 	if p.summary || interval == 0 || !isTerminal {
 		cl = nil
 	}
-	echo := func(isFinal bool) {
+	echo := func(isFinal bool) *SnapshotReport {
 		report := snapshot()
 		p.updateProgressValue(report)
 		os.Stdout.WriteString(backCursor)
@@ -113,6 +114,7 @@ func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Durat
 		} else {
 			backCursor = ""
 		}
+		return report
 	}
 
 	if interval > 0 {
@@ -132,7 +134,7 @@ func (p *Printer) PrintLoop(snapshot func() *SnapshotReport, interval time.Durat
 	} else {
 		<-doneChan
 	}
-	echo(true)
+	return echo(true)
 }
 
 // nolint

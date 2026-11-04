@@ -94,7 +94,7 @@ docker run --rm --net=host ghcr.io/six-ddc/plow
 ```bash
 usage: plow [<flags>] <url>
 
-A high-performance HTTP benchmarking tool with real-time web UI and terminal displaying
+A high-performance HTTP benchmarking tool with real-time web UI and terminal displaying, use --history to record a run and "plow history" to browse the recorded runs
 
 Examples:
 
@@ -135,6 +135,9 @@ Flags:
                                  Output errors to file
       --summary                  Only print the summary without realtime reports
       --unix-socket=UNIX-SOCKET  Unix domain socket path to use for connection
+      --history                  Record this run in the history to browse by "plow history"
+      --history-dir=DIR          Directory to record the history, default is ~/.plow/history
+      --label=LABEL              Mark this run with a label, such as the change being tested
       --version                  Show application version.
 
   Flags default values also read from env PLOW_SOME_FLAG, such as PLOW_TIMEOUT=5s equals to --timeout=5s
@@ -177,6 +180,24 @@ Latency Phases  Count    Min     Mean      P50      P90      P99      Max
 - `Write` is the time of writing the request, `Wait` is the time from the request written to the first response byte (TTFB), `Read` is the time of reading the rest of the response.
 - When a proxy is used (`--socks5` or `HTTP(S)_PROXY` env), the whole proxy dialing is measured as `Connect`.
 - The mean latency of each phase per second is also shown in the Web charts.
+
+Benchmark history:
+
+Add `--history` to record a run in `~/.plow/history`, including the data of the real-time charts of each second. After the runs are finished, `plow history` serves a page to browse and compare them:
+
+```bash
+plow http://127.0.0.1:8080/ -c 20 -d 30s --history --label "after cache"
+plow history                 # http://127.0.0.1:18889, use --listen :18889 to allow the access from other hosts
+plow history --auto-open-browser --history-dir /path/to/history
+```
+
+- The runs of each method and URL are listed with their options, and the RPS, latency and error rate of each run are shown as trend charts.
+- Select a run in the table or the charts to replay its real-time charts.
+- Select two runs to compare them, the older one is the baseline unless swapped. The options, status codes, errors, latency and throughput are shown side by side, the changes over 3% are highlighted as better or worse, and the real-time charts of them are drawn together.
+- Label a run by `--label` to tell it from the others, and click `Refresh` to load the runs finished after the page is opened.
+- All the runs are kept, delete the ones not needed in the page.
+
+![compare](history-compare.png)
 
 ### Bash/ZSH Shell Completion
 

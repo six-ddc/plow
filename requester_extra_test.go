@@ -222,3 +222,35 @@ func TestRequesterRunSendsConfiguredRequests(t *testing.T) {
 		t.Fatalf("error output = %q, want empty", errOut.String())
 	}
 }
+
+func TestDoRequestClearsCodeOfReusedRecordOnError(t *testing.T) {
+	ln, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		_ = fasthttp.Serve(ln, func(ctx *fasthttp.RequestCtx) {
+			time.Sleep(200 * time.Millisecond)
+		})
+	}()
+
+	requester, err := NewRequester(1, 1, 0, nil, &bytes.Buffer{}, &ClientOpt{
+		url:       "http://" + ln.Addr().String() + "/",
+		method:    fasthttp.MethodGet,
+		maxConns:  1,
+		doTimeout: 20 * time.Millisecond,
+	}, -1, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var req fasthttp.Request
+	var resp fasthttp.Response
+	req.SetRequestURI("http://" + ln.Addr().String() + "/")
+	rr := &ReportRecord{code: fasthttp.StatusOK}
+	requester.DoRequest(&req, &resp, rr)
+	if rr.error == "" || rr.code != 0 {
+		t.Fatalf("record = code %d error %q, want the timeout error without the code of the last request", rr.code, rr.error)
+	}
+}

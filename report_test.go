@@ -2,6 +2,7 @@ package main
 
 import (
 	"math"
+	"reflect"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -130,5 +131,88 @@ func TestStreamReportCharts(t *testing.T) {
 	report.lock.Unlock()
 	if got := report.Charts(); got != nil {
 		t.Fatalf("Charts() = %+v when noDateWithinSec is true, want nil", got)
+	}
+}
+
+func TestStreamReportSeries(t *testing.T) {
+	oldStartTime := atomic.LoadInt64(&startTimeUnixNano)
+	t.Cleanup(func() { atomic.StoreInt64(&startTimeUnixNano, oldStartTime) })
+	atomic.StoreInt64(&startTimeUnixNano, time.Now().UnixNano())
+
+	report := NewStreamReport(false)
+	history := &History{}
+	history.Record(report.Seconds())
+	records := make(chan *ReportRecord, 3)
+	done := make(chan struct{})
+	go func() {
+		report.Collect(records, nil)
+		close(done)
+	}()
+
+	records <- &ReportRecord{cost: 10 * time.Millisecond, code: 200, concurrencyCount: 2}
+	records <- &ReportRecord{cost: 30 * time.Millisecond, code: 503, concurrencyCount: 2}
+	records <- &ReportRecord{cost: 20 * time.Millisecond, error: "timeout", concurrencyCount: 2}
+	time.Sleep(1100 * time.Millisecond)
+	close(records)
+	<-done
+
+	<-history.done
+	series := history.series
+	if len(series) != 1 {
+		t.Fatalf("series = %+v, want one point", series)
+	}
+	p := series[0]
+	if p.Count != 3 || p.Codes[200] != 1 || p.Codes[503] != 1 || len(p.Codes) != 2 || p.Concurrency != 2 || p.RPS <= 0 || p.Phases != nil {
+		t.Fatalf("point = %+v, want 3 requests, codes 200 and 503, concurrency 2 and positive RPS", p)
+	}
+	if p.Min != 10*time.Millisecond || p.Mean != 20*time.Millisecond || p.Max != 30*time.Millisecond {
+		t.Fatalf("point latency = %+v, want 10ms / 20ms / 30ms", p)
+	}
+	if p.Elapsed < time.Second || p.Elapsed > 2*time.Second {
+		t.Fatalf("point elapsed = %s, want about 1s", p.Elapsed)
+	}
+}
+
+func TestMergeSeries(t *testing.T) {
+	points := []SeriesPoint{
+		{Elapsed: 1 * time.Second, Count: 10, RPS: 10, Min: 2 * time.Millisecond, Mean: 4 * time.Millisecond, Max: 6 * time.Millisecond, Codes: map[int]int64{200: 10}, Concurrency: 1, Phases: []time.Duration{2, 0}},
+		{Elapsed: 2 * time.Second, Count: 30, RPS: 30, Min: 1 * time.Millisecond, Mean: 8 * time.Millisecond, Max: 9 * time.Millisecond, Codes: map[int]int64{200: 40}, Concurrency: 2, Phases: []time.Duration{4, 0}},
+		{Elapsed: 3 * time.Second, Concurrency: 2},
+		{Elapsed: 4 * time.Second, Count: 20, RPS: 20, Min: 3 * time.Millisecond, Mean: 3 * time.Millisecond, Max: 3 * time.Millisecond, Concurrency: 3},
+		{Elapsed: 5 * time.Second, Count: 5, RPS: 5, Min: 5 * time.Millisecond, Mean: 5 * time.Millisecond, Max: 5 * time.Millisecond, Concurrency: 3},
+	}
+
+	if same := mergeSeries(points, 5); len(same) != 5 {
+		t.Fatalf("mergeSeries within the limit = %+v, want the points", same)
+	}
+
+	got := mergeSeries(points, 3)
+	want := []SeriesPoint{
+		{Elapsed: 2 * time.Second, Count: 40, RPS: 20, Min: 1 * time.Millisecond, Mean: 7 * time.Millisecond, Max: 9 * time.Millisecond, Codes: map[int]int64{200: 40}, Concurrency: 2, Phases: []time.Duration{3, 0}},
+		{Elapsed: 4 * time.Second, Count: 20, RPS: 10, Min: 3 * time.Millisecond, Mean: 3 * time.Millisecond, Max: 3 * time.Millisecond, Concurrency: 3},
+		{Elapsed: 5 * time.Second, Count: 5, RPS: 5, Min: 5 * time.Millisecond, Mean: 5 * time.Millisecond, Max: 5 * time.Millisecond, Concurrency: 3},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("mergeSeries = %+v, want %+v", got, want)
+	}
+}
+
+func TestStreamReportSecondsClosedWithoutAnySecond(t *testing.T) {
+	report := NewStreamReport(false)
+	history := &History{}
+	history.Record(report.Seconds())
+	records := make(chan *ReportRecord, 1)
+	go report.Collect(records, nil)
+	records <- &ReportRecord{cost: time.Millisecond, code: 200}
+	close(records)
+	<-report.Done()
+
+	select {
+	case <-history.done:
+		if len(history.series) != 0 {
+			t.Fatalf("series = %+v, want none for a run shorter than a second", history.series)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("the recording isn't done after the collecting is done")
 	}
 }

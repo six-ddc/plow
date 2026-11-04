@@ -108,8 +108,9 @@ type Requester struct {
 	closeOnce  sync.Once
 	wg         sync.WaitGroup
 
-	readBytes  int64
-	writeBytes int64
+	readBytes   int64
+	writeBytes  int64
+	interrupted int32
 
 	cancel func()
 }
@@ -279,6 +280,11 @@ func (r *Requester) Cancel() {
 	r.cancel()
 }
 
+// Interrupted reports whether the run is stopped by ctrl-c or SIGTERM.
+func (r *Requester) Interrupted() bool {
+	return atomic.LoadInt32(&r.interrupted) == 1
+}
+
 func (r *Requester) RecordChan() <-chan *ReportRecord {
 	return r.recordChan
 }
@@ -307,6 +313,7 @@ func (r *Requester) DoRequest(req *fasthttp.Request, resp *fasthttp.Response, rr
 
 	if err != nil {
 		rr.cost = time.Since(startTime) - t1
+		rr.code = 0
 		rr.error = err.Error()
 		return
 	}
@@ -320,6 +327,7 @@ func (r *Requester) DoRequest(req *fasthttp.Request, resp *fasthttp.Response, rr
 	err = resp.BodyWriteTo(writeTo)
 	if err != nil {
 		rr.cost = time.Since(startTime) - t1
+		rr.code = 0
 		rr.error = err.Error()
 		return
 	}
@@ -341,6 +349,7 @@ func (r *Requester) Run() {
 		defer close(signalDone)
 		select {
 		case <-sigs:
+			atomic.StoreInt32(&r.interrupted, 1)
 			r.closeRecord()
 			cancelFunc()
 		case <-ctx.Done():
@@ -417,6 +426,7 @@ func (r *Requester) Run() {
 						if err != nil {
 							rr := recordPool.Get().(*ReportRecord)
 							rr.cost = 0
+							rr.code = 0
 							rr.error = err.Error()
 							rr.readBytes = atomic.LoadInt64(&r.readBytes)
 							rr.writeBytes = atomic.LoadInt64(&r.writeBytes)
